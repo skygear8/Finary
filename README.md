@@ -19,6 +19,10 @@ npm run dev    # http://localhost:3000
 - **Immobilier** : coût d'acquisition, quote-part, valorisation, rendement brut et net, cash-flow, crédits avec capital restant dû et tableau d'amortissement.
 - **Import CSV** de positions (format décrit dans l'app).
 
+## Mise en ligne
+
+Voir [DEPLOIEMENT.md](DEPLOIEMENT.md) : Docker + volume persistant + mot de passe (`APP_PASSWORD`), installable sur iPhone.
+
 ## Stack
 
 Next.js 15 (App Router, server actions), TypeScript, Tailwind CSS 4, Drizzle ORM + better-sqlite3, Recharts.

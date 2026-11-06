@@ -1,10 +1,23 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import Link from "next/link";
 import "./globals.css";
+import { authEnabled } from "@/lib/auth";
+import { logout } from "./connexion/actions";
 
 export const metadata: Metadata = {
   title: "Socle · Patrimoine",
   description: "Suivi personnel de patrimoine financier et immobilier",
+  appleWebApp: { capable: true, title: "Socle", statusBarStyle: "default" },
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#f6f7f9" },
+    { media: "(prefers-color-scheme: dark)", color: "#0d0f12" },
+  ],
 };
 
 const nav = [
@@ -19,7 +32,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="fr">
       <body className="antialiased">
         <div className="mx-auto flex min-h-screen max-w-6xl flex-col md:flex-row">
-          <aside className="border-b border-border p-4 md:w-56 md:border-b-0 md:border-r md:p-6">
+          <aside className="pt-[max(1rem,env(safe-area-inset-top))] border-b border-border p-4 md:w-56 md:border-b-0 md:border-r md:p-6">
             <Link href="/" className="text-lg font-semibold tracking-tight">
               <span className="text-accent">▲</span> Socle
             </Link>
@@ -30,6 +43,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 </Link>
               ))}
             </nav>
+            {authEnabled() && (
+              <form action={logout} className="mt-2 md:mt-4">
+                <button className="px-3 text-xs text-muted hover:text-foreground">Se déconnecter</button>
+              </form>
+            )}
           </aside>
           <main className="flex-1 p-4 md:p-8">{children}</main>
         </div>
