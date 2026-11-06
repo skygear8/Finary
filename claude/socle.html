@@ -908,7 +908,10 @@ function ruleKey(label) {
     .replace(/\b(cb|carte|prlv|prelevement|sepa|vir|virement|inst|instantane|paiement|achat|du|le|la|les|de|des|en|x|fr|paris|facture|recu|emis|ref)\b/g, " ")
     .replace(/\s+/g, " ").trim().split(" ").slice(0, 2).join(" ");
 }
+// virement mensuel de 600 € vers Fortuneo = épargne : 300 € sur le PEA + 300 € sur le Livret A
+const isFortuneoSaving = (t) => t.accountId !== "joint" && Math.abs(t.amount + 600) < 0.005 && /halbaut|fortuneo/.test(normL(t.label));
 function catOf(t) {
+  if (isFortuneoSaving(t) && (!t.cat || t.cat === "interne")) return "epargne";
   if (t.cat && BCATS[t.cat]) return t.cat;
   const L = normL(t.label);
   for (const r of R.rules) if (r.match && L.includes(r.match) && BCATS[r.cat]) return r.cat;
@@ -1002,7 +1005,7 @@ function balRow(r) {
 }
 function txRow(t) {
   const [l, k, col] = BCATS[t.c];
-  return `<button class="row txr" data-act="tx-edit" data-id="${t.id}"><span class="txl"><span class="dot" style="background:${col}"></span><span style="min-width:0"><div class="name">${esc(t.label)}</div><div class="meta">${l}${t.cat ? "" : " · auto"} · ${esc(accLabel(t.accountId))}</div></span></span>
+  return `<button class="row txr" data-act="tx-edit" data-id="${t.id}"><span class="txl"><span class="dot" style="background:${col}"></span><span style="min-width:0"><div class="name">${esc(t.label)}</div><div class="meta">${isFortuneoSaving(t) && t.c === "epargne" ? "Épargne : 300 € PEA + 300 € Livret A" : l + (t.cat ? "" : " · auto")} · ${esc(accLabel(t.accountId))}</div></span></span>
     <span class="amt ${t.amount > 0 ? "gain" : ""}" ${k === "int" ? 'style="color:var(--muted)"' : ""}>${t.amount > 0 ? "+" : "−"}${fE2(Math.abs(t.amount))}</span></button>`;
 }
 function budgetAccOptions(sel) {
