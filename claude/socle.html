@@ -8,21 +8,23 @@
   --bg: #f4f3ef;
   --surface: #ffffff;
   --sunk: #eceae4;
-  --fg: #13201e;
-  --muted: #687470;
+  --fg: #141b2c;
+  --muted: #67708a;
   --line: #e7e4dd;
-  --accent: #0d6b5f;
-  --hero: linear-gradient(150deg, #0c3b34 0%, #0d6b5f 58%, #1f8f7e 100%);
-  --shadow: 0 1px 2px rgb(20 30 28 / 0.04), 0 8px 24px -12px rgb(20 30 28 / 0.14);
+  --accent: #1f3f86;
+  --gold: #b8892b;
+  --gold-hi: #e9c46a;
+  --hero: linear-gradient(150deg, #0a1633 0%, #17306b 55%, #24489a 100%);
+  --shadow: 0 1px 2px rgb(20 28 50 / 0.04), 0 8px 24px -12px rgb(20 28 50 / 0.16);
   --panel-border: transparent;
   --accent-ink: #ffffff;
   --gain: #12805c;
   --loss: #c2410c;
-  --c-liq: #7b8f8a;
-  --c-bourse: #0e6e64;
+  --c-liq: #8592a6;
+  --c-bourse: #1f3f86;
   --c-av: #6d5bd0;
-  --c-crypto: #c98a12;
-  --c-immo: #2f6fd6;
+  --c-crypto: #d9822b;
+  --c-immo: #c39a2f;
   --c-es: #b4497e;
   --c-autre: #a3b1ad;
   --font-display: "Sora", ui-sans-serif, system-ui, sans-serif;
@@ -31,18 +33,18 @@
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #0b1110; --surface: #131b1a; --sunk: #1b2523; --fg: #e6eeec; --muted: #94a6a1; --line: #222e2c;
-    --hero: linear-gradient(150deg, #0a2b26 0%, #0f5047 60%, #177466 100%); --shadow: none; --panel-border: #1f2a28;
-    --accent: #3cc4b2; --accent-ink: #062320; --gain: #4ade9b; --loss: #fb8b4b;
-    --c-liq: #8fa39e; --c-bourse: #3cc4b2; --c-av: #a395f2; --c-crypto: #e8b44a; --c-immo: #6fa1f2; --c-es: #e07fb0; --c-autre: #5d6f6b;
+    --bg: #0a0e17; --surface: #121826; --sunk: #1a2132; --fg: #e8ecf4; --muted: #98a2b6; --line: #232c3e;
+    --hero: linear-gradient(150deg, #070f24 0%, #132a5e 58%, #1e3f86 100%); --gold: #e2bc5c; --gold-hi: #f0d488; --shadow: none; --panel-border: #1f2738;
+    --accent: #8fb0ff; --accent-ink: #0a1633; --gain: #4ade9b; --loss: #fb8b4b;
+    --c-liq: #98a5ba; --c-bourse: #8fb0ff; --c-av: #a395f2; --c-crypto: #f0a35a; --c-immo: #e2bc5c; --c-es: #e07fb0; --c-autre: #5d6f6b;
     color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
-  --bg: #0b1110; --surface: #131b1a; --sunk: #1b2523; --fg: #e6eeec; --muted: #94a6a1; --line: #222e2c;
-    --hero: linear-gradient(150deg, #0a2b26 0%, #0f5047 60%, #177466 100%); --shadow: none; --panel-border: #1f2a28;
-  --accent: #3cc4b2; --accent-ink: #062320; --gain: #4ade9b; --loss: #fb8b4b;
-  --c-liq: #8fa39e; --c-bourse: #3cc4b2; --c-av: #a395f2; --c-crypto: #e8b44a; --c-immo: #6fa1f2; --c-es: #e07fb0; --c-autre: #5d6f6b;
+  --bg: #0a0e17; --surface: #121826; --sunk: #1a2132; --fg: #e8ecf4; --muted: #98a2b6; --line: #232c3e;
+    --hero: linear-gradient(150deg, #070f24 0%, #132a5e 58%, #1e3f86 100%); --gold: #e2bc5c; --gold-hi: #f0d488; --shadow: none; --panel-border: #1f2738;
+  --accent: #8fb0ff; --accent-ink: #0a1633; --gain: #4ade9b; --loss: #fb8b4b;
+  --c-liq: #98a5ba; --c-bourse: #8fb0ff; --c-av: #a395f2; --c-crypto: #f0a35a; --c-immo: #e2bc5c; --c-es: #e07fb0; --c-autre: #5d6f6b;
   color-scheme: dark;
 }
 * { box-sizing: border-box; }
@@ -180,14 +182,18 @@ input, select {
 .panel, .tile { border-color: var(--panel-border); box-shadow: var(--shadow); }
 .tile { padding: 14px 15px; }
 .tile .v { font-size: 20px; letter-spacing: -0.02em; }
-.hero { position: relative; overflow: hidden; margin-top: 14px; padding: 22px 20px 0; border-radius: 24px; background: var(--hero); color: #fff; box-shadow: 0 18px 40px -22px rgb(13 107 95 / 0.7); }
-.hero::after { content: ""; position: absolute; right: -60px; top: -80px; width: 220px; height: 220px; border-radius: 50%; background: radial-gradient(closest-side, rgb(255 255 255 / 0.14), transparent); pointer-events: none; }
+.hero { position: relative; overflow: hidden; margin-top: 14px; padding: 22px 20px 0; border-radius: 24px; background: var(--hero); color: #fff; box-shadow: 0 18px 40px -22px rgb(15 35 90 / 0.75); }
+.hero::after { content: ""; position: absolute; right: -60px; top: -80px; width: 220px; height: 220px; border-radius: 50%; background: radial-gradient(closest-side, rgb(233 196 106 / 0.22), transparent); pointer-events: none; }
 .hero .eyebrow, .hero .sub { color: rgb(255 255 255 / 0.78); }
 .hero .big { color: #fff; }
 .hero .sub { padding-bottom: 20px; }
 .hero .sub .gain, .hero .sub .loss { color: #fff; }
 .hero:has(.spark) .sub { padding-bottom: 6px; }
-.chip-d { display: inline-block; padding: 2px 9px; border-radius: 99px; background: rgb(255 255 255 / 0.16); font-weight: 600; margin-right: 4px; }
+.chip-d { display: inline-block; padding: 2px 9px; border-radius: 99px; background: rgb(233 196 106 / 0.18); color: var(--gold-hi) !important; font-weight: 600; margin-right: 4px; }
+.hero .eyebrow { color: var(--gold-hi); }
+.hero::before { content: ""; position: absolute; left: 20px; right: 20px; top: 0; height: 2px; background: linear-gradient(90deg, transparent, var(--gold-hi), transparent); opacity: 0.7; }
+.bar > i { background: linear-gradient(90deg, var(--accent), var(--gold)); }
+.tab[aria-current="page"] svg { color: var(--gold); }
 .spark { display: block; width: calc(100% + 40px); height: 56px; margin: 4px -20px 0; }
 .section { margin-top: 26px; }
 h2 { font-size: 16px; }
@@ -230,7 +236,7 @@ details.fold > .section-head { margin-top: 6px; }
 
 <div class="wrap">
   <header class="brand">
-    <b><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5 15 14.5H1z" fill="var(--accent)"/></svg>Socle</b>
+    <b><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5 15 14.5H1z" fill="var(--gold)"/></svg>Socle</b>
     <span class="status" id="status">Chargement…</span>
   </header>
   <main id="view"></main>
@@ -375,7 +381,7 @@ function spark(ys) {
   const W = 300, H = 46, min = Math.min(...ys), max = Math.max(...ys), r = max - min || 1;
   const pts = ys.map((y, i) => [(i / (ys.length - 1)) * W, 4 + (1 - (y - min) / r) * (H - 8)]);
   const d = pts.map((p, i) => `${i ? "L" : "M"}${p[0].toFixed(1)},${p[1].toFixed(1)}`).join("");
-  return `<svg class="spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true"><path d="${d}L${W},${H}L0,${H}Z" fill="url(#sg)"/><defs><linearGradient id="sg" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".28"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient></defs><path d="${d}" fill="none" stroke="#fff" stroke-width="2" vector-effect="non-scaling-stroke" stroke-linejoin="round"/></svg>`;
+  return `<svg class="spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true"><path d="${d}L${W},${H}L0,${H}Z" fill="url(#sg)"/><defs><linearGradient id="sg" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#e9c46a" stop-opacity=".3"/><stop offset="1" stop-color="#e9c46a" stop-opacity="0"/></linearGradient></defs><path d="${d}" fill="none" stroke="#e9c46a" stroke-width="2" vector-effect="non-scaling-stroke" stroke-linejoin="round"/></svg>`;
 }
 function lineChart(points, label) {
   if (points.length < 2) return `<p class="note">La courbe se construit toute seule : une photo de ton patrimoine net est enregistrée chaque jour où tu ouvres Socle.</p>`;
