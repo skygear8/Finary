@@ -119,7 +119,7 @@ svg text { fill: var(--muted); font-family: var(--font-body); font-size: 10px; }
   padding-bottom: env(safe-area-inset-bottom, 0px);
   padding-left: max(8px, env(safe-area-inset-left, 0px)); padding-right: max(8px, env(safe-area-inset-right, 0px));
 }
-.tabs nav { max-width: 760px; margin: 0 auto; display: grid; grid-template-columns: repeat(3, 1fr); }
+.tabs nav { max-width: 760px; margin: 0 auto; display: grid; grid-template-columns: repeat(4, 1fr); }
 .tab { appearance: none; background: none; border: 0; color: var(--muted); font: 500 12px var(--font-body); padding: 10px 4px 9px; display: grid; justify-items: center; gap: 3px; cursor: pointer; }
 .tab svg { width: 22px; height: 22px; }
 .tab[aria-current="page"] { color: var(--accent); }
@@ -154,6 +154,13 @@ input, select {
 .upd .name { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .upd input { text-align: right; }
 .upd input.changed { border-color: var(--accent); }
+.seg { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: none; margin-inline: -2px; }
+.seg::-webkit-scrollbar { display: none; }
+.seg-b { appearance: none; flex: none; border: 1px solid var(--line); background: var(--surface); color: var(--fg); border-radius: 99px; padding: 7px 13px; font: 500 14px var(--font-body); cursor: pointer; }
+.seg-b span { color: var(--muted); font-size: 12px; }
+.seg-b[aria-selected="true"] { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+.seg-b[aria-selected="true"] span { color: inherit; opacity: 0.7; }
+.seg-b:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .head-btns { display: flex; gap: 8px; align-items: center; flex: none; }
 .btn.sm { padding: 7px 12px; font-size: 13px; }
 .todo { background: var(--surface); border: 1px dashed var(--accent); border-radius: var(--r); padding: 12px 14px; margin-bottom: 12px; display: grid; gap: 8px; font-size: 14px; }
@@ -181,6 +188,7 @@ input, select {
   <nav aria-label="Sections">
     <button class="tab" data-tab="synthese"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 19V10M10 19V5M16 19v-7M21 19H3"/></svg>Synthèse</button>
     <button class="tab" data-tab="comptes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="6" width="18" height="13" rx="2.5"/><path d="M3 10h18M7 15h4"/></svg>Comptes</button>
+    <button class="tab" data-tab="positions"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 18 9 12l4 3 7-8"/><path d="M15 7h5v5"/></svg>Positions</button>
     <button class="tab" data-tab="immobilier"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 11 12 4l9 7M5.5 9.5V20h13V9.5M10 20v-5h4v5"/></svg>Immobilier</button>
   </nav>
 </div>
@@ -357,24 +365,102 @@ function viewSynthese(P) {
   </section>`;
 }
 
+const ENVELOPES = [
+  { k: "all", label: "Tout" },
+  { k: "cto", label: "CTO" },
+  { k: "pea", label: "PEA" },
+  { k: "assurance_vie", label: "Assurance-vie" },
+  { k: "courant", label: "Compte courant" },
+  { k: "livret", label: "Livrets" },
+  { k: "per", label: "PER" },
+  { k: "crypto", label: "Crypto" },
+  { k: "autre", label: "Autre" },
+];
+const ALWAYS = ["all", "cto", "pea", "assurance_vie", "courant", "livret"];
+let env = "all";
+
+function accountRow(a) {
+  const pnl = a.hs.reduce((s, h) => s + h.qty * (h.price - h.pru), 0);
+  const bits = [a.institution ? esc(a.institution) : "", a.updatedAt ? ago(a.updatedAt) : "", a.hs.length ? `${a.hs.length} ligne${a.hs.length > 1 ? "s" : ""}` : ""].filter(Boolean).join(" · ");
+  return `<button class="row" data-act="open-account" data-id="${a.id}">
+    <span><div class="name">${esc(a.name)}</div><div class="meta">${bits}</div></span>
+    <span class="amt">${fE(a.value)}${a.hs.length ? `<small class="${tone(pnl)}">${pnl >= 0 ? "+" : "−"}${fE(Math.abs(pnl))}</small>` : ""}</span></button>`;
+}
+function holdingRows(list, showAccount) {
+  return list.map((h) => {
+    const v = h.qty * h.price, g = h.qty * (h.price - h.pru), gp = h.pru ? ((h.price - h.pru) / h.pru) * 100 : 0;
+    return `<button class="row" data-act="edit-holding" data-id="${h.id}"><span><div class="name">${esc(h.name)}</div>
+      <div class="meta">${showAccount ? esc(h.accName) + " · " : ""}${h.qty.toLocaleString("fr-FR", { maximumFractionDigits: 6 })} × ${fE2(h.price)} · PRU ${fE2(h.pru)}</div></span>
+      <span class="amt">${fE(v)}<small class="${tone(g)}">${g >= 0 ? "+" : "−"}${fE(Math.abs(g))} · ${fP(gp, 1)}</small></span></button>`;
+  }).join("");
+}
+
 function viewComptes(P) {
-  const groups = Object.entries(ACCOUNT_TYPES).map(([k, label]) => ({ k, label, rows: P.accRows.filter((a) => a.type === k).sort((a, b) => b.value - a.value) })).filter((g) => g.rows.length);
-  const total = P.accRows.reduce((s, a) => s + a.value, 0);
+  const present = new Set(P.accRows.map((a) => a.type));
+  const envs = ENVELOPES.filter((e) => ALWAYS.includes(e.k) || present.has(e.k));
+  if (!envs.some((e) => e.k === env)) env = "all";
+  const rows = P.accRows.filter((a) => env === "all" || a.type === env).sort((a, b) => b.value - a.value);
+  const total = rows.reduce((s, a) => s + a.value, 0);
+  const cash = rows.reduce((s, a) => s + (a.cash || 0), 0);
+  const hs = rows.flatMap((a) => a.hs.map((h) => ({ ...h, accName: a.name })));
+  const inv = hs.reduce((s, h) => s + h.qty * h.pru, 0), pnl = hs.reduce((s, h) => s + h.qty * (h.price - h.pru), 0);
+  const label = ENVELOPES.find((e) => e.k === env).label;
+  const isInvest = !["courant", "livret"].includes(env);
+  const chips = `<div class="seg" role="tablist" aria-label="Enveloppes">${envs.map((e) => {
+    const n = e.k === "all" ? P.accRows.length : P.accRows.filter((a) => a.type === e.k).length;
+    return `<button role="tab" class="seg-b" aria-selected="${e.k === env}" data-env="${e.k}">${e.label}${n ? ` <span>${n}</span>` : ""}</button>`;
+  }).join("")}</div>`;
+  let body;
+  if (env === "all") {
+    const groups = Object.entries(ACCOUNT_TYPES).map(([k, l]) => ({ k, l, rows: rows.filter((a) => a.type === k) })).filter((g) => g.rows.length);
+    body = groups.map((g) => `<section class="section"><div class="section-head"><h2>${g.l}</h2><span class="total">${fE(g.rows.reduce((s, a) => s + a.value, 0))}</span></div>
+      <div class="panel list">${g.rows.map(accountRow).join("")}</div></section>`).join("") || `<div class="section"><div class="panel empty">Aucun compte pour l'instant.</div></div>`;
+  } else {
+    body = `
+    ${isInvest && rows.length ? `<div class="grid2" style="margin-top:4px">${tile("Investi (PRU)", hs.length ? fE(inv) : "—", hs.length ? "" : "aucune position saisie")}${tile("Plus-value latente", hs.length ? fE(pnl) : "—", hs.length && inv ? fP((pnl / inv) * 100) : "", hs.length ? tone(pnl) : "")}${tile("Liquidités", fE(cash))}${tile("Positions", String(hs.length))}</div>` : ""}
+    <section class="section"><div class="section-head"><h2>${rows.length > 1 ? "Comptes" : "Compte"}</h2></div>
+      <div class="panel list">${rows.map(accountRow).join("") || `<div class="empty">Aucun compte ${label} pour l'instant.</div>`}</div></section>
+    ${isInvest && rows.length ? `<section class="section"><div class="section-head"><h2>Positions</h2>${rows.length === 1 ? `<button class="btn ghost sm" data-act="new-holding" data-id="${rows[0].id}">Ajouter</button>` : ""}</div>
+      <div class="panel list">${holdingRows(hs.sort((a, b) => b.qty * b.price - a.qty * a.price), rows.length > 1) || `<div class="empty">Aucune position. Ouvre le compte pour en ajouter : le solde actuel reste compté en liquidités.</div>`}</div></section>` : ""}`;
+  }
   return `
-  <section class="hero"><div class="eyebrow">Comptes et placements</div><div class="big">${fE(total)}</div></section>
-  ${total ? `<button class="btn ghost add" data-act="monthly">Mise à jour du mois</button>` : ""}
-  ${groups.map((g) => `
-    <section class="section">
-      <div class="section-head"><h2>${g.label}</h2><span class="total">${fE(g.rows.reduce((s, a) => s + a.value, 0))}</span></div>
-      <div class="panel list">${g.rows.map((a) => {
-        const pnl = a.hs.reduce((s, h) => s + h.qty * (h.price - h.pru), 0);
-        return `<button class="row" data-act="open-account" data-id="${a.id}">
-          <span><div class="name">${esc(a.name)}</div><div class="meta">${esc(a.institution || "")}${a.updatedAt ? `${a.institution ? " · " : ""}${ago(a.updatedAt)}` : ""}${a.hs.length ? `${a.institution ? " · " : ""}${a.hs.length} ligne${a.hs.length > 1 ? "s" : ""}` : ""}</div></span>
-          <span class="amt">${fE(a.value)}${a.hs.length ? `<small class="${tone(pnl)}">${pnl >= 0 ? "+" : "−"}${fE(Math.abs(pnl))}</small>` : ""}</span></button>`;
-      }).join("")}</div>
-    </section>`).join("")}
-  ${groups.length ? "" : `<div class="panel empty">Aucun compte pour l'instant.</div>`}
-  <div class="section"><button class="btn add" data-act="new-account">Ajouter un compte</button></div>`;
+  <section class="hero"><div class="eyebrow">${env === "all" ? "Comptes et placements" : label}</div><div class="big">${fE(total)}</div></section>
+  ${chips}
+  ${P.accRows.length ? `<button class="btn ghost add" data-act="monthly" style="margin-block:12px 6px">Mise à jour du mois</button>` : ""}
+  ${body}
+  <div class="section"><button class="btn add" data-act="new-account" ${env !== "all" ? `data-type="${env}"` : ""}>Ajouter ${env === "all" ? "un compte" : "un compte " + label}</button></div>`;
+}
+
+function viewPositions(P) {
+  const all = P.accRows.flatMap((a) => a.hs.map((h) => ({ ...h, accName: a.name, accType: a.type })));
+  // regroupe une même valeur détenue dans plusieurs enveloppes
+  const map = new Map();
+  for (const h of all) {
+    const key = (h.ticker || h.name).trim().toUpperCase();
+    const g = map.get(key) || { name: h.name, ticker: h.ticker, cls: h.cls, qty: 0, cost: 0, value: 0, lines: [] };
+    g.qty += h.qty; g.cost += h.qty * h.pru; g.value += h.qty * h.price; g.lines.push(h);
+    map.set(key, g);
+  }
+  const groups = [...map.values()].sort((a, b) => b.value - a.value);
+  const total = groups.reduce((s, g) => s + g.value, 0), cost = groups.reduce((s, g) => s + g.cost, 0), pnl = total - cost;
+  const byCls = {}; for (const g of groups) byCls[g.cls || "autre"] = (byCls[g.cls || "autre"] || 0) + g.value;
+  if (!groups.length) return `
+    <section class="hero"><div class="eyebrow">Positions en portefeuille</div><div class="big">${fE(0)}</div></section>
+    <div class="panel empty">Aucune position pour l'instant. Tes comptes importés n'ont que leur solde.<br>Ouvre un PEA, un CTO ou une assurance-vie dans Comptes et ajoute tes lignes (quantité, PRU, cours).<br><button class="btn" data-tab="comptes">Aller aux comptes</button></div>`;
+  return `
+  <section class="hero"><div class="eyebrow">Positions en portefeuille</div><div class="big">${fE(total)}</div>
+    <div class="sub"><span class="${tone(pnl)}">${pnl >= 0 ? "+" : "−"}${fE(Math.abs(pnl))} · ${fP(cost ? (pnl / cost) * 100 : 0)}</span> sur ${fE(cost)} investis</div></section>
+  <div class="panel kv">${Object.entries(byCls).sort((a, b) => b[1] - a[1]).map(([k, v]) => `<div><span>${ASSET_CLASSES[k] || k}</span><span>${fE(v)} · ${fP((v / total) * 100, 1)}</span></div>`).join("")}</div>
+  <section class="section"><div class="section-head"><h2>${groups.length} ligne${groups.length > 1 ? "s" : ""}</h2><span class="note">poids · +/- value</span></div>
+    <div class="panel list">${groups.map((g) => {
+      const gp = g.cost ? ((g.value - g.cost) / g.cost) * 100 : 0, pru = g.qty ? g.cost / g.qty : 0, w = total ? (g.value / total) * 100 : 0;
+      const where = [...new Set(g.lines.map((l) => l.accName))].join(", ");
+      const target = g.lines.length === 1 ? `data-act="edit-holding" data-id="${g.lines[0].id}"` : `data-act="open-account" data-id="${g.lines[0].accountId}"`;
+      return `<button class="row" ${target}><span><div class="name">${esc(g.name)}${g.ticker ? ` <span class="pill">${esc(g.ticker)}</span>` : ""}</div>
+        <div class="meta">${esc(where)} · ${g.qty.toLocaleString("fr-FR", { maximumFractionDigits: 6 })} · PRU ${fE2(pru)}</div>
+        <div class="bar" style="margin-top:6px;max-width:160px"><i style="width:${w.toFixed(1)}%"></i></div></span>
+        <span class="amt">${fE(g.value)}<small class="note">${fP(w, 1)}</small><small class="${tone(g.value - g.cost)}">${g.value >= g.cost ? "+" : "−"}${fE(Math.abs(g.value - g.cost))} · ${fP(gp, 1)}</small></span></button>`;
+    }).join("")}</div></section>`;
 }
 
 function viewImmo(P) {
@@ -524,7 +610,7 @@ function formHtml(kind, data, extra) {
     const val = d[k] ?? o.def ?? (type === "number" ? "" : "");
     const id = `f-${kind}-${k}`;
     const input = typeof type === "object"
-      ? `<select id="${id}" name="${k}">${Object.entries(type).map(([v, l]) => `<option value="${v}" ${v === (d[k] ?? (kind === "holding" && k === "cls" && extra?.crypto ? "crypto" : "")) ? "selected" : ""}>${l}</option>`).join("")}</select>`
+      ? `<select id="${id}" name="${k}">${Object.entries(type).map(([v, l]) => `<option value="${v}" ${v === (d[k] ?? (kind === "holding" && k === "cls" ? (extra?.crypto ? "crypto" : "etf") : kind === "account" && k === "type" ? extra?.type : "")) ? "selected" : ""}>${l}</option>`).join("")}</select>`
       : `<input id="${id}" name="${k}" type="${type === "number" ? "text" : type}" ${type === "number" ? 'inputmode="decimal"' : ""} value="${esc(val)}" ${o.req ? "required" : ""} placeholder="${esc(o.ph || "")}">`;
     return `<label class="${o.full ? "full" : ""}" for="${id}">${label}${input}</label>`;
   };
@@ -554,7 +640,7 @@ function readForm(form) {
 async function save(col, id, data) {
   if (!db) throw new Error("La sauvegarde n'est pas disponible dans cette vue.");
   if (id) await db.collection(col).doc(id).set({ ...data, updatedAt: new Date().toISOString() });
-  else await db.collection(col).add({ ...data, createdAt: new Date().toISOString() });
+  else return (await db.collection(col).add({ ...data, createdAt: new Date().toISOString() })).id;
 }
 async function remove(kind, id) {
   const col = F[kind].col;
@@ -576,9 +662,10 @@ async function snapshotToday() {
 const $ = (s) => document.querySelector(s);
 function render() {
   const P = portfolio();
-  $("#view").innerHTML = tab === "comptes" ? viewComptes(P) : tab === "immobilier" ? viewImmo(P) : viewSynthese(P);
+  $("#view").innerHTML = tab === "comptes" ? viewComptes(P) : tab === "positions" ? viewPositions(P) : tab === "immobilier" ? viewImmo(P) : viewSynthese(P);
   document.querySelectorAll(".tab").forEach((t) => t.setAttribute("aria-current", t.dataset.tab === tab ? "page" : "false"));
   if (sheet && sheet.live) openSheet(sheet, true);
+  else if (pendingOpen) openPending();
 }
 function openSheet(s, refresh) {
   sheet = s;
@@ -599,12 +686,13 @@ function openForm(kind, data, extra) {
 function goBack() { const b = sheet?.back; if (b) openSheet(b); else closeSheet(); }
 
 function setTab(t) {
-  tab = ["synthese", "comptes", "immobilier"].includes(t) ? t : "synthese";
+  tab = ["synthese", "comptes", "positions", "immobilier"].includes(t) ? t : "synthese";
   if (location.hash.slice(1) !== tab) { try { history.replaceState(null, "", "#" + tab); } catch {} }
   render(); window.scrollTo(0, 0);
 }
 
 document.addEventListener("click", async (e) => {
+  const sb = e.target.closest("[data-env]"); if (sb) { env = sb.dataset.env; return render(); }
   const t = e.target.closest("[data-tab],[data-act]"); if (!t) return;
   if (t.dataset.tab) return setTab(t.dataset.tab);
   const id = t.dataset.id, act = t.dataset.act;
@@ -614,7 +702,7 @@ document.addEventListener("click", async (e) => {
   if (act === "open-account") openSheet({ type: "account", id, live: true });
   else if (act === "open-property") openSheet({ type: "property", id, live: true });
   else if (act === "monthly") openSheet({ html: sheetMonthly() });
-  else if (act === "new-account") openForm("account");
+  else if (act === "new-account") openForm("account", null, { type: t.dataset.type });
   else if (act === "edit-account") openForm("account", find("accounts"));
   else if (act === "new-holding") openForm("holding", null, { parent: id, crypto: find("accounts")?.type === "crypto" });
   else if (act === "edit-holding") openForm("holding", find("holdings"), { parent: find("holdings")?.accountId });
@@ -641,11 +729,20 @@ document.addEventListener("submit", async (e) => {
   if (old?.createdAt) data.createdAt = old.createdAt;
   const btn = form.querySelector("[type=submit]"); btn.disabled = true; btn.textContent = "Enregistrement…";
   try {
-    await save(F[kind].col, id, data);
+    const newId = await save(F[kind].col, id, data);
     const back = sheet?.back;
-    if (back) openSheet(back); else closeSheet();
+    if (newId && (kind === "account" || kind === "property")) { sheet = null; pendingOpen = { type: kind, id: newId, live: true }; openPending(); }
+    else if (back) openSheet(back); else closeSheet();
   } catch (err) { showErr(err); btn.disabled = false; btn.textContent = "Enregistrer"; }
 });
+let pendingOpen = null;
+// la nouvelle ligne arrive par le flux de données : on ouvre sa fiche dès qu'elle est là
+function openPending() {
+  if (!pendingOpen) return;
+  const list = pendingOpen.type === "account" ? S.accounts : S.properties;
+  if (list.some((x) => x.id === pendingOpen.id)) { const o = pendingOpen; pendingOpen = null; openSheet(o); }
+  else closeSheet();
+}
 async function saveMonthly(form) {
   const btn = form.querySelector("[type=submit]"), now = new Date().toISOString();
   const changes = [...form.querySelectorAll("input[data-orig]")].filter((i) => Math.abs(num(i.value) - Number(i.dataset.orig)) > 0.004);
