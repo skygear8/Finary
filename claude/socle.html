@@ -127,7 +127,7 @@ svg text { fill: var(--muted); font-family: var(--font-body); font-size: 10px; }
   padding-bottom: env(safe-area-inset-bottom, 0px);
   padding-left: max(8px, env(safe-area-inset-left, 0px)); padding-right: max(8px, env(safe-area-inset-right, 0px));
 }
-.tabs nav { max-width: 760px; margin: 0 auto; display: grid; grid-template-columns: repeat(4, 1fr); }
+.tabs nav { max-width: 760px; margin: 0 auto; display: grid; grid-template-columns: repeat(5, 1fr); }
 .tab { appearance: none; background: none; border: 0; color: var(--muted); font: 500 12px var(--font-body); padding: 10px 4px 9px; display: grid; justify-items: center; gap: 3px; cursor: pointer; }
 .tab svg { width: 22px; height: 22px; }
 .tab[aria-current="page"] { color: var(--accent); }
@@ -220,7 +220,7 @@ details.fold > .section-head { margin-top: 6px; }
 .seg-b { border-color: var(--line); background: var(--surface); }
 .seg-b[aria-selected="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
 .btn { border-radius: 14px; }
-.tabs { left: 50%; right: auto; bottom: calc(10px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); width: min(420px, calc(100% - 24px)); border: 1px solid var(--line); border-radius: 22px; padding: 4px; box-shadow: 0 12px 32px -14px rgb(0 0 0 / 0.35); background: color-mix(in srgb, var(--surface) 88%, transparent); backdrop-filter: blur(14px) saturate(1.4); -webkit-backdrop-filter: blur(14px) saturate(1.4); }
+.tabs { left: 50%; right: auto; bottom: calc(10px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); width: min(480px, calc(100% - 16px)); border: 1px solid var(--line); border-radius: 22px; padding: 4px; box-shadow: 0 12px 32px -14px rgb(0 0 0 / 0.35); background: color-mix(in srgb, var(--surface) 88%, transparent); backdrop-filter: blur(14px) saturate(1.4); -webkit-backdrop-filter: blur(14px) saturate(1.4); }
 .tab { border-radius: 18px; padding: 8px 4px 7px; font-size: 11px; }
 .tab[aria-current="page"] { background: color-mix(in srgb, var(--accent) 12%, transparent); }
 .wrap { padding-bottom: calc(110px + env(safe-area-inset-bottom, 0px)); }
@@ -244,6 +244,25 @@ details.fold > .section-head { margin-top: 6px; }
   @keyframes up { from { transform: translateY(24px); } }
   @media (min-width: 800px) { @keyframes up { from { transform: translate(-50%, 24px); } } }
 }
+/* Budget */
+.budget-hero .mnav { display: flex; align-items: center; gap: 6px; margin-left: -6px; }
+.mbtn { appearance: none; border: 0; background: rgb(255 255 255 / 0.12); color: #fff; width: 28px; height: 28px; border-radius: 99px; font-size: 17px; line-height: 1; cursor: pointer; }
+.mbtn:disabled { opacity: 0.3; cursor: default; }
+.budget-hero .eyebrow { text-transform: none; letter-spacing: 0; font-size: 14px; }
+.cats { display: grid; gap: 2px; padding-block: 8px; }
+.catrow { appearance: none; background: none; border: 0; color: inherit; font: inherit; text-align: left; cursor: pointer; display: grid; grid-template-columns: 10px minmax(0, 1fr) auto; column-gap: 10px; row-gap: 6px; align-items: center; padding: 8px 4px; border-radius: 10px; }
+.catrow .bar { grid-column: 2 / -1; height: 5px; }
+.catrow .cn { font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.catrow .cn small, .catrow .cv small { display: block; font-size: 12px; color: var(--muted); font-weight: 400; }
+.catrow .cv { text-align: right; font-weight: 600; font-size: 14px; }
+.catrow[aria-pressed="true"] { background: var(--sunk); }
+.dayh { font-size: 12px; color: var(--muted); padding: 12px 2px 2px; text-transform: capitalize; }
+.dayh:first-child { padding-top: 0; }
+.dayh + .row { border-top: 0; }
+.txl { display: grid; grid-template-columns: 10px minmax(0, 1fr); gap: 10px; align-items: center; min-width: 0; }
+label.chk { display: flex; gap: 8px; align-items: flex-start; color: var(--fg); font-size: 13px; }
+label.chk input { width: auto; margin-top: 2px; }
+.section .actions .btn.sm { flex: 0 0 auto; }
 </style>
 
 <div class="wrap">
@@ -261,6 +280,7 @@ details.fold > .section-head { margin-top: 6px; }
     <button class="tab" data-tab="comptes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="6" width="18" height="13" rx="2.5"/><path d="M3 10h18M7 15h4"/></svg>Comptes</button>
     <button class="tab" data-tab="positions"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 18 9 12l4 3 7-8"/><path d="M15 7h5v5"/></svg>Positions</button>
     <button class="tab" data-tab="immobilier"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 11 12 4l9 7M5.5 9.5V20h13V9.5M10 20v-5h4v5"/></svg>Immobilier</button>
+    <button class="tab" data-tab="budget"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7.5A2.5 2.5 0 0 1 6.5 5H18v4"/><rect x="3.5" y="8" width="17" height="11" rx="2.5"/><path d="M16 13.5h1.5"/></svg>Budget</button>
   </nav>
 </div>
 
@@ -361,10 +381,10 @@ function propertyMetrics(p, loans) {
 
 /* ---------------- État ---------------- */
 const S = { accounts: [], holdings: [], properties: [], loans: [], snapshots: [], flows: [], ready: false, writable: true };
-const COLS = ["accounts", "holdings", "properties", "loans", "snapshots", "flows"];
+const COLS = ["accounts", "holdings", "properties", "loans", "snapshots", "flows", "tx", "rules"];
 // profils : chaque compte / bien porte `profile` (absent = nathan). R garde tout, S ne montre que le profil choisi.
 const PROFILES = [{ k: "nathan", label: "Nathan" }, { k: "angelique", label: "Angélique" }, { k: "foyer", label: "Foyer" }];
-const R = { accounts: [], holdings: [], properties: [], loans: [], snapshots: [], flows: [] };
+const R = { accounts: [], holdings: [], properties: [], loans: [], snapshots: [], flows: [], tx: [], rules: [] };
 let profile = "nathan"; try { const v = localStorage.getItem("socle-profil"); if (PROFILES.some((p) => p.k === v)) profile = v; } catch { }
 const ownerOf = (x) => x.profile || "nathan";
 const snapPrefix = (k) => (k === "nathan" ? "" : k + "_");
@@ -854,8 +874,274 @@ function sheetMonthly() {
   </form>`;
 }
 
+/* ---------------- Budget (comptes courants perso + compte joint) ---------------- */
+// opérations : collection tx {accountId ("joint" pour le compte joint), date, amount (signé), label, cat?, note?}
+// règles apprises : collection rules {match (libellé normalisé), cat}
+const BCATS = {
+  salaire: ["Salaire", "in", "#c39a2f"], autres_rev: ["Autres revenus", "in", "#e2bc5c"],
+  logement: ["Logement et énergie", "out", "#1f3f86"], courses: ["Courses", "out", "#3d63b8"], resto: ["Restaurants et sorties", "out", "#d9822b"],
+  transport: ["Transport", "out", "#5b7fd0"], abos: ["Abonnements et téléphone", "out", "#7a68d8"], sante: ["Santé", "out", "#2f9e8f"],
+  loisirs: ["Loisirs et voyages", "out", "#e07fb0"], shopping: ["Shopping", "out", "#b0569a"], maison: ["Maison", "out", "#8a6d3b"],
+  impots: ["Impôts et taxes", "out", "#6b7487"], banque: ["Frais bancaires", "out", "#98a5ba"], autres: ["Autres dépenses", "out", "#8592a6"],
+  epargne: ["Épargne et placements", "save", "#2f7d4f"], interne: ["Virement entre nos comptes", "int", "#b7bfcc"],
+};
+const BAUTO = [
+  [/salaire|\bpaie\b|remuneration|payroll/, "salaire"],
+  [/caf\b|pole emploi|france travail|remboursement|cpam.*rbt|interets/, "autres_rev"],
+  [/trade republic|xtb|epsor|swisslife|swiss life|livret|\bpea\b|bitpanda|binance|coinbase|boursorama vie|linxea|yomoni/, "epargne"],
+  [/compte joint|vir.* (interne|de compte a compte)|halbaut|rochetti|revolut.*top|top.?up|alimentation compte/, "interne"],
+  [/loyer|edf|engie|totalenergies (elec|gaz)|veolia|saur|eau de|syndic|foncia|nexity|assurance hab|maif|macif|matmut|axa/, "logement"],
+  [/carrefour|leclerc|auchan|intermarche|lidl|aldi|monoprix|franprix|casino|super u|hyper u|u express|picard|biocoop|naturalia|grand frais|netto|proxi|spar\b|g20/, "courses"],
+  [/restaurant|resto|mcdo|mc donald|burger|kfc|deliveroo|uber ?eats|just ?eat|starbucks|boulangerie|patisserie|cafe|brasserie|sushi|pizza|kebab|bar\b|pub\b/, "resto"],
+  [/sncf|ouigo|ratp|tcar|navigo|uber|bolt|blablacar|esso|shell|\bbp\b|avia|carburant|station|peage|autoroute|sanef|aprr|parking|indigo|lime\b|tier\b|leasys|norauto|feu vert/, "transport"],
+  [/netflix|spotify|deezer|disney|canal\+?|prime video|amazon prime|apple\.com|icloud|google (one|storage|play)|youtube|free mobile|freebox|\bsfr\b|orange|bouygues|sosh|red by|chatgpt|openai|anthropic|claude\.ai/, "abos"],
+  [/pharmacie|doctolib|medecin|docteur|dentiste|mutuelle|opticien|laboratoire|kine|hopital/, "sante"],
+  [/cinema|ugc|pathe|fnac|steam|playstation|nintendo|airbnb|booking|hotel|ryanair|easyjet|air france|vueling|transavia|decathlon|basic.?fit|fitness|concert|ticketmaster/, "loisirs"],
+  [/amazon|amzn|zalando|vinted|zara|h&m|uniqlo|primark|kiabi|sephora|nocibe|cdiscount|shein|apple store/, "shopping"],
+  [/ikea|leroy merlin|castorama|brico|but\b|conforama|maisons du monde|action\b|gifi/, "maison"],
+  [/dgfip|impot|tresor public|amende|antai/, "impots"],
+  [/frais|cotisation|commission|agios|interets debiteurs/, "banque"],
+];
+const normL = (s) => String(s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/\s+/g, " ").trim();
+function ruleKey(label) {
+  return normL(label).replace(/[0-9]+/g, " ").replace(/[^a-z&+. ]/g, " ")
+    .replace(/\b(cb|carte|prlv|prelevement|sepa|vir|virement|inst|instantane|paiement|achat|du|le|la|les|de|des|en|x|fr|paris|facture|recu|emis|ref)\b/g, " ")
+    .replace(/\s+/g, " ").trim().split(" ").slice(0, 2).join(" ");
+}
+function catOf(t) {
+  if (t.cat && BCATS[t.cat]) return t.cat;
+  const L = normL(t.label);
+  for (const r of R.rules) if (r.match && L.includes(r.match) && BCATS[r.cat]) return r.cat;
+  for (const [re, c] of BAUTO) if (re.test(L)) return c;
+  return t.amount >= 0 ? "autres_rev" : "autres";
+}
+const isBudgetAcc = (a) => a.type === "courant" && !/trade republic/i.test(a.institution || "");
+const isJointAcc = (a) => a.joint || /joint/i.test(a.name || "");
+let bMonth = null, bScope = "all", bCat = null, bImport = null;
+function budgetData() {
+  const accs = R.accounts.filter(isBudgetAcc);
+  const perso = accs.filter((a) => !isJointAcc(a) && (profile === "foyer" || ownerOf(a) === profile));
+  const jointBal = accs.filter(isJointAcc).reduce((s, a) => s + (a.cash || 0), 0);
+  const persoIds = new Set(perso.map((a) => a.id));
+  const tx = R.tx.filter((t) => (t.accountId === "joint" ? bScope !== "perso" : persoIds.has(t.accountId) && bScope !== "joint"))
+    .map((t) => ({ ...t, c: catOf(t) }));
+  return { perso, jointBal, tx, hasJoint: accs.some(isJointAcc) };
+}
+const accLabel = (id) => id === "joint" ? "Compte joint" : (() => { const a = R.accounts.find((x) => x.id === id); return a ? `${a.institution || a.name}${profile === "foyer" ? " · " + (PROFILES.find((p) => p.k === ownerOf(a))?.label || "") : ""}` : "Compte supprimé"; })();
+const ym = (d) => String(d).slice(0, 7);
+const monthName = (m, long = true) => new Date(m + "-15").toLocaleDateString("fr-FR", long ? { month: "long", year: "numeric" } : { month: "short" }).replace(".", "");
+const shiftM = (m, k) => { const d = new Date(m + "-15"); d.setMonth(d.getMonth() + k); return d.toISOString().slice(0, 7); };
+function monthTotals(tx) {
+  const by = {};
+  for (const t of tx) by[t.c] = (by[t.c] || 0) + t.amount;
+  const kindSum = (k) => Object.entries(by).filter(([c]) => BCATS[c][1] === k).reduce((s, [, v]) => s + v, 0);
+  const inc = kindSum("in"), out = -kindSum("out"), save = -kindSum("save");
+  return { by, inc, out, save, rest: inc - out };
+}
+function budgetBars(months) {
+  const W = 320, H = 118, top = 8, base = H - 18, max = Math.max(1, ...months.flatMap((m) => [m.inc, m.out]));
+  const gw = W / months.length, bw = Math.min(9, gw / 3.2);
+  const bars = months.map((m, i) => {
+    const x = i * gw + gw / 2, h1 = (Math.max(0, m.inc) / max) * (base - top), h2 = (Math.max(0, m.out) / max) * (base - top);
+    return `<rect x="${(x - bw - 1).toFixed(1)}" y="${(base - h1).toFixed(1)}" width="${bw}" height="${h1.toFixed(1)}" rx="2" fill="var(--gold)"${m.cur ? "" : ' opacity=".55"'}/>` +
+      `<rect x="${(x + 1).toFixed(1)}" y="${(base - h2).toFixed(1)}" width="${bw}" height="${h2.toFixed(1)}" rx="2" fill="var(--accent)"${m.cur ? "" : ' opacity=".55"'}/>` +
+      `<text x="${x.toFixed(1)}" y="${H - 4}" text-anchor="middle"${m.cur ? ' style="fill:var(--fg);font-weight:600"' : ""}>${monthName(m.m, false).slice(0, 3)}</text>`;
+  }).join("");
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Revenus et dépenses des 12 derniers mois"><line x1="0" x2="${W}" y1="${base}" y2="${base}" stroke="var(--line)"/>${bars}</svg>`;
+}
+function viewBudget() {
+  const D = budgetData();
+  const months = [...new Set(D.tx.map((t) => ym(t.date)))].sort();
+  const today = new Date().toISOString().slice(0, 7);
+  if (!bMonth) bMonth = months.length ? months[months.length - 1] : today;
+  const cur = D.tx.filter((t) => ym(t.date) === bMonth), T = monthTotals(cur);
+  const last12 = Array.from({ length: 12 }, (_, i) => shiftM(bMonth, i - 11));
+  const series = last12.map((m) => ({ m, cur: m === bMonth, ...monthTotals(D.tx.filter((t) => ym(t.date) === m)) }));
+  const withData = series.filter((s) => !s.cur && D.tx.some((t) => ym(t.date) === s.m));
+  const avg = (c) => withData.length ? withData.reduce((s, x) => s + (x.by[c] || 0), 0) / withData.length : null;
+  const rate = T.inc > 0 ? (T.rest / T.inc) * 100 : null;
+  const scopeSeg = `<div class="seg" role="tablist" aria-label="Comptes">${[["all", "Tout"], ["perso", profile === "foyer" ? "Comptes perso" : "Mes comptes"], ["joint", "Compte joint"]].map(([k, l]) => `<button role="tab" class="seg-b" aria-selected="${bScope === k}" data-bscope="${k}">${l}</button>`).join("")}</div>`;
+  const balRows = [...D.perso.map((a) => ({ id: a.id, n: a.name, inst: accLabel(a.id), v: a.cash || 0 })), ...(D.hasJoint ? [{ id: "joint", n: "Compte joint", inst: "BoursoBank · à deux", v: D.jointBal }] : [])]
+    .filter((r) => bScope === "all" || (bScope === "joint") === (r.id === "joint"));
+  const cats = Object.entries(T.by).filter(([c, v]) => BCATS[c][1] === "out" && v < 0).map(([c, v]) => ({ c, v: -v })).sort((a, b) => b.v - a.v);
+  const maxCat = Math.max(1, ...cats.map((x) => x.v));
+  const list = cur.filter((t) => !bCat || t.c === bCat).sort((a, b) => b.date.localeCompare(a.date) || a.amount - b.amount);
+  const days = [...new Set(list.map((t) => t.date))];
+  const head = `
+  <section class="hero budget-hero">
+    <div class="mnav"><button class="mbtn" data-bmonth="-1" aria-label="Mois précédent">‹</button><div class="eyebrow">${monthName(bMonth)}</div><button class="mbtn" data-bmonth="1" aria-label="Mois suivant" ${bMonth >= today ? "disabled" : ""}>›</button></div>
+    <div class="big">${cur.length ? (T.rest >= 0 ? "+" : "−") + fE(Math.abs(T.rest)) : "—"}</div>
+    <div class="sub">${cur.length ? `reste après dépenses · ${rate != null ? `<span class="chip-d">${fP(rate, 0)} épargné</span>` : ""}` : "aucune opération ce mois-ci"}</div>
+  </section>`;
+  if (!R.tx.length) return head + `
+  <div class="section">${scopeSeg}</div>
+  <section class="section"><h2>Comptes courants</h2><div class="panel list">${balRows.map(balRow).join("")}</div></section>
+  <div class="section"><div class="panel empty">Le budget se remplit avec les opérations de vos comptes courants.<br>Importe un relevé CSV (Fortuneo, BoursoBank, Revolut) ou envoie tes relevés à Claude.<br>
+    <button class="btn" data-act="tx-import">Importer un relevé</button> <button class="btn ghost" data-act="tx-new">Ajouter une opération</button></div></div>`;
+  return head + `
+  <div class="grid2 grid4">
+    ${tile("Revenus", fE(T.inc), avg("salaire") != null ? "moy. " + fE(withData.reduce((s, x) => s + x.inc, 0) / withData.length) : "")}
+    ${tile("Dépenses", fE(T.out), withData.length ? "moy. " + fE(withData.reduce((s, x) => s + x.out, 0) / withData.length) : "")}
+    ${tile("Épargne placée", fE(T.save), "PEA, livrets, AV…")}
+    ${tile("Taux d'épargne", rate != null ? fP(rate, 0) : "—", "part des revenus non dépensée", rate != null ? tone(rate) : "")}
+  </div>
+  <div class="section">${scopeSeg}</div>
+  <section class="section"><div class="section-head"><h2>Où part l'argent</h2><span class="total">${fE(T.out)}</span></div>
+    <div class="panel cats">${cats.map(({ c, v }) => { const a = avg(c), [l, , col] = BCATS[c]; return `<button class="catrow" data-bcat="${c}" aria-pressed="${bCat === c}">
+      <span class="dot" style="background:${col}"></span><span class="cn">${l}${a != null ? `<small>moy. ${fE(-a)}</small>` : ""}</span><span class="cv">${fE(v)}<small>${T.out ? fP((v / T.out) * 100, 0) : ""}</small></span>
+      <span class="bar"><i style="width:${((v / maxCat) * 100).toFixed(1)}%;background:${col}"></i></span></button>`; }).join("") || `<div class="empty">Aucune dépense ce mois-ci.</div>`}</div></section>
+  <section class="section"><div class="section-head"><h2>12 derniers mois</h2><span class="note"><span class="dot" style="display:inline-block;background:var(--gold)"></span> revenus <span class="dot" style="display:inline-block;background:var(--accent);margin-left:6px"></span> dépenses</span></div>
+    <div class="panel">${budgetBars(series)}</div></section>
+  <section class="section"><h2>Comptes courants</h2><div class="panel list">${balRows.map(balRow).join("")}</div></section>
+  <section class="section"><div class="section-head"><h2>Opérations${bCat ? ` · ${BCATS[bCat][0]} <button class="pill" data-bcat="${bCat}" aria-label="Retirer le filtre">×</button>` : ""}</h2><span class="note">${list.length}</span></div>
+    <div class="actions"><button class="btn ghost sm" data-act="tx-new">Ajouter</button><button class="btn ghost sm" data-act="tx-import">Importer un relevé</button></div>
+    <div class="panel list">${days.map((d) => `<div class="dayh">${new Date(d).toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "short" })}</div>` + list.filter((t) => t.date === d).map(txRow).join("")).join("") || `<div class="empty">Aucune opération.</div>`}</div></section>`;
+}
+function balRow(r) {
+  return `<div class="row" style="cursor:default"><span><div class="name">${esc(r.n)}</div><div class="meta">${esc(r.inst)}</div></span><span class="amt">${fE2(r.v)}</span></div>`;
+}
+function txRow(t) {
+  const [l, k, col] = BCATS[t.c];
+  return `<button class="row txr" data-act="tx-edit" data-id="${t.id}"><span class="txl"><span class="dot" style="background:${col}"></span><span style="min-width:0"><div class="name">${esc(t.label)}</div><div class="meta">${l}${t.cat ? "" : " · auto"} · ${esc(accLabel(t.accountId))}</div></span></span>
+    <span class="amt ${t.amount > 0 ? "gain" : ""}" ${k === "int" ? 'style="color:var(--muted)"' : ""}>${t.amount > 0 ? "+" : "−"}${fE2(Math.abs(t.amount))}</span></button>`;
+}
+function budgetAccOptions(sel) {
+  const accs = R.accounts.filter((a) => isBudgetAcc(a) && !isJointAcc(a) && (profile === "foyer" || ownerOf(a) === profile));
+  const opts = [...accs.map((a) => [a.id, accLabel(a.id) + " · " + a.name]), ["joint", "Compte joint"]];
+  return opts.map(([v, l]) => `<option value="${v}" ${v === sel ? "selected" : ""}>${esc(l)}</option>`).join("");
+}
+function sheetTx(t) {
+  const d = t || { date: new Date().toISOString().slice(0, 10), amount: "", label: "" };
+  const auto = t ? catOf({ ...t, cat: null }) : null, key = t ? ruleKey(t.label) : "";
+  return `<div class="sheet-head"><h2>${t ? "Opération" : "Ajouter une opération"}</h2><button class="x" data-act="close" aria-label="Fermer">×</button></div>
+  <form class="f" data-kind="tx" data-id="${t?.id || ""}">
+    <fieldset>
+      <label class="full">Libellé<input name="label" value="${esc(d.label)}" required></label>
+      <label>Date<input name="date" type="date" value="${esc(d.date)}" required></label>
+      <label>Montant (€, négatif = dépense)<input name="amount" inputmode="decimal" value="${d.amount === "" ? "" : String(d.amount).replace(".", ",")}" required></label>
+      <label class="full">Compte<select name="accountId">${budgetAccOptions(d.accountId || (bScope === "joint" ? "joint" : ""))}</select></label>
+      <label class="full">Catégorie<select name="cat"><option value="">Automatique${auto ? " (" + BCATS[auto][0] + ")" : ""}</option>${Object.entries(BCATS).map(([k, [l]]) => `<option value="${k}" ${t?.cat === k ? "selected" : ""}>${l}</option>`).join("")}</select></label>
+      ${t && key ? `<label class="full chk"><input type="checkbox" name="learn" value="${esc(key)}"> Classer aussi les autres opérations « ${esc(key)} » dans cette catégorie</label>` : ""}
+      <label class="full">Note<input name="note" value="${esc(d.note || "")}"></label>
+    </fieldset>
+    <p class="err" id="form-err" hidden></p>
+    <div class="actions"><button class="btn" type="submit">Enregistrer</button>${t ? `<button class="btn danger" type="button" data-act="delete" data-kind="tx" data-id="${t.id}">Supprimer</button>` : ""}</div>
+  </form>`;
+}
+async function saveTx(form) {
+  const fd = new FormData(form), id = form.dataset.id || null, btn = form.querySelector("[type=submit]");
+  const data = { label: String(fd.get("label") || "").trim(), date: String(fd.get("date")), amount: num(fd.get("amount")), accountId: String(fd.get("accountId")), cat: String(fd.get("cat") || "") || null, note: String(fd.get("note") || "").trim() };
+  btn.disabled = true; btn.textContent = "Enregistrement…";
+  try {
+    const learn = fd.get("learn");
+    if (learn && data.cat) { await db.collection("rules").doc("r_" + learn.replace(/[^a-z0-9]+/g, "-").slice(0, 60)).set({ match: learn, cat: data.cat, createdAt: new Date().toISOString() }); data.cat = null; }
+    if (id) { const { id: _d, c: _c, ...old } = R.tx.find((x) => x.id === id) || {}; await db.collection("tx").doc(id).set({ ...old, ...data, updatedAt: new Date().toISOString() }); }
+    else await db.collection("tx").add({ ...data, src: "saisie", createdAt: new Date().toISOString() });
+    closeSheet();
+  } catch (err) { showErr(err); btn.disabled = false; btn.textContent = "Enregistrer"; }
+}
+/* import CSV : Fortuneo, BoursoBank, Revolut et la plupart des exports bancaires */
+function splitCSV(text, delim) {
+  const rows = []; let row = [], cell = "", q = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (q) { if (ch === '"' && text[i + 1] === '"') { cell += '"'; i++; } else if (ch === '"') q = false; else cell += ch; }
+    else if (ch === '"') q = true;
+    else if (ch === delim) { row.push(cell); cell = ""; }
+    else if (ch === "\n" || ch === "\r") { if (ch === "\r" && text[i + 1] === "\n") i++; row.push(cell); rows.push(row); row = []; cell = ""; }
+    else cell += ch;
+  }
+  if (cell || row.length) { row.push(cell); rows.push(row); }
+  return rows.filter((r) => r.some((c) => c.trim()));
+}
+function parseDateFR(s) {
+  s = String(s || "").trim(); let m;
+  if ((m = s.match(/^(\d{4})-(\d{2})-(\d{2})/))) return `${m[1]}-${m[2]}-${m[3]}`;
+  if ((m = s.match(/^(\d{1,2})[/.-](\d{1,2})[/.-](\d{2,4})/))) return `${m[3].length === 2 ? "20" + m[3] : m[3]}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}`;
+  return null;
+}
+const parseAmt = (s) => { s = String(s ?? "").replace(/[\s  €]/g, ""); if (!s) return null; if (/,\d{1,2}$/.test(s)) s = s.replace(/\./g, "").replace(",", "."); else s = s.replace(/,/g, ""); const n = Number(s); return Number.isFinite(n) ? n : null; };
+function parseBankCSV(text) {
+  text = text.replace(/^﻿/, "");
+  const firstLines = text.split(/\r?\n/).slice(0, 20).join("\n");
+  const delim = [";", ",", "\t"].map((d) => [d, firstLines.split(d).length]).sort((a, b) => b[1] - a[1])[0][0];
+  const rows = splitCSV(text, delim);
+  const hi = rows.findIndex((r) => r.some((c) => /date/i.test(c)) && r.some((c) => /montant|amount|d[ée]bit|cr[ée]dit/i.test(c)));
+  if (hi < 0) throw new Error("Je ne reconnais pas les colonnes de ce fichier (il faut au moins une date et un montant).");
+  const H = rows[hi].map((c) => normL(c));
+  const col = (...res) => { for (const re of res) { const i = H.findIndex((h) => re.test(h)); if (i >= 0) return i; } return -1; };
+  const iDate = col(/date (de l.)?op/, /^dateop/, /completed date/, /started date/, /^date$/, /date/);
+  const iLab = col(/libelle/, /description/, /label/, /intitule/, /detail/, /operation/);
+  const iAmt = col(/^montant/, /^amount/, /montant/);
+  const iDeb = col(/debit/), iCre = col(/credit/), iFee = col(/^fee$/, /frais/), iState = col(/^state$/, /statut|etat/);
+  const out = [];
+  for (const r of rows.slice(hi + 1)) {
+    if (iState >= 0 && r[iState] && !/completed|termin|effectu/i.test(r[iState])) continue;
+    const date = parseDateFR(r[iDate]); if (!date) continue;
+    let amt = iAmt >= 0 ? parseAmt(r[iAmt]) : null;
+    if (amt == null) { const d = parseAmt(r[iDeb]), c = parseAmt(r[iCre]); if (d == null && c == null) continue; amt = (c ? Math.abs(c) : 0) - (d ? Math.abs(d) : 0); }
+    if (iFee >= 0) { const f = parseAmt(r[iFee]); if (f) amt -= Math.abs(f); }
+    const label = String(r[iLab] ?? "").replace(/\s+/g, " ").trim() || "Opération";
+    out.push({ date, amount: Math.round(amt * 100) / 100, label });
+  }
+  if (!out.length) throw new Error("Aucune opération lisible dans ce fichier.");
+  return out;
+}
+const fnv = (s) => { let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return (h >>> 0).toString(36); };
+function txIds(accountId, list) {
+  const seen = {};
+  return list.map((t) => { const base = `${accountId}|${t.date}|${t.amount.toFixed(2)}|${normL(t.label)}`; seen[base] = (seen[base] || 0) + 1; return "t_" + fnv(base + "|" + seen[base]) + fnv(base); });
+}
+function sheetImport() {
+  const s = bImport || {};
+  const known = s.rows ? new Set(R.tx.map((t) => t.id)) : null;
+  const fresh = s.rows ? s.rows.filter((_, i) => !known.has(s.ids[i])) : [];
+  return `<div class="sheet-head"><h2>Importer un relevé</h2><button class="x" data-act="close" aria-label="Fermer">×</button></div>
+  <div class="f">
+    <p class="note">Exporte les opérations en CSV depuis ta banque (Fortuneo, BoursoBank, Revolut…) puis choisis le fichier. Les opérations déjà importées sont ignorées.</p>
+    <fieldset>
+      <label class="full">Compte<select id="imp-acc">${budgetAccOptions(s.acc)}</select></label>
+      <label class="full">Fichier CSV<input id="imp-file" type="file" accept=".csv,.txt,text/csv"></label>
+    </fieldset>
+    ${s.err ? `<p class="err">${esc(s.err)}</p>` : ""}
+    ${s.rows ? `<div class="panel kv"><div><span>Opérations lues</span><span>${s.rows.length}</span></div><div><span>Période</span><span>${new Date(s.rows.reduce((m, t) => t.date < m ? t.date : m, "9")).toLocaleDateString("fr-FR")} → ${new Date(s.rows.reduce((m, t) => t.date > m ? t.date : m, "0")).toLocaleDateString("fr-FR")}</span></div>
+      <div><span>Entrées</span><span class="gain">${fE2(s.rows.filter((t) => t.amount > 0).reduce((a, t) => a + t.amount, 0))}</span></div><div><span>Sorties</span><span>${fE2(-s.rows.filter((t) => t.amount < 0).reduce((a, t) => a + t.amount, 0))}</span></div>
+      <div class="strong"><span>Nouvelles à importer</span><span>${fresh.length}</span></div></div>
+      <div class="actions"><button class="btn" data-act="tx-import-run" ${fresh.length ? "" : "disabled"}>${fresh.length ? `Importer ${fresh.length} opération${fresh.length > 1 ? "s" : ""}` : "Rien de nouveau"}</button></div>` : ""}
+  </div>`;
+}
+async function runImport(btn) {
+  const s = bImport; if (!s?.rows) return;
+  const known = new Set(R.tx.map((t) => t.id)), now = new Date().toISOString();
+  const todo = s.rows.map((t, i) => [s.ids[i], t]).filter(([id]) => !known.has(id));
+  btn.disabled = true;
+  try {
+    for (let i = 0; i < todo.length; i += 25) {
+      btn.textContent = `Import… ${Math.min(i + 25, todo.length)}/${todo.length}`;
+      await Promise.all(todo.slice(i, i + 25).map(([id, t]) => db.collection("tx").doc(id).set({ ...t, accountId: s.acc, src: "csv", createdAt: now })));
+    }
+    bMonth = todo.map(([, t]) => ym(t.date)).sort().pop() || bMonth;
+    bImport = null; closeSheet();
+    $("#status").textContent = `${todo.length} opération${todo.length > 1 ? "s" : ""} importée${todo.length > 1 ? "s" : ""}`;
+  } catch (err) { btn.disabled = false; btn.textContent = "Réessayer"; s.err = "Import interrompu. Réessaie : les opérations déjà enregistrées ne seront pas doublées."; openSheet({ html: sheetImport() }); }
+}
+document.addEventListener("change", async (e) => {
+  if (e.target.id === "imp-acc" && bImport) { bImport.acc = e.target.value; if (bImport.rows) bImport.ids = txIds(bImport.acc, bImport.rows); openSheet({ html: sheetImport() }); }
+  if (e.target.id !== "imp-file" || !e.target.files?.[0]) return;
+  const acc = document.getElementById("imp-acc").value;
+  try {
+    const buf = await e.target.files[0].arrayBuffer();
+    let text = new TextDecoder("utf-8").decode(buf);
+    if (text.includes("�")) text = new TextDecoder("windows-1252").decode(buf);
+    const rows = parseBankCSV(text);
+    bImport = { acc, rows, ids: txIds(acc, rows) };
+  } catch (err) { bImport = { acc, err: err.message || "Fichier illisible." }; }
+  openSheet({ html: sheetImport() });
+});
+
 /* ---------------- Formulaires ---------------- */
 const F = {
+  tx: { title: "Opération", col: "tx", groups: [] },
   account: { title: "Compte", col: "accounts", groups: [[null, [
     ["name", "Nom", "text", { full: 1, req: 1, ph: "PEA, Livret A…" }], ["type", "Type", ACCOUNT_TYPES], ["institution", "Établissement", "text"],
     ["cash", "Liquidités ou solde (€)", "number", { full: 1 }]]], ["Historique (facultatif)", [
@@ -957,7 +1243,7 @@ function render() {
   const P = portfolio();
   const pb = document.getElementById("profiles");
   if (pb) pb.innerHTML = PROFILES.map((p) => `<button role="tab" class="prof" aria-selected="${p.k === profile}" data-profile="${p.k}"><span class="av-s">${p.k === "foyer" ? "∞" : p.label.charAt(0)}</span>${p.label}</button>`).join("");
-  $("#view").innerHTML = tab === "comptes" ? viewComptes(P) : tab === "positions" ? viewPositions(P) : tab === "immobilier" ? viewImmo(P) : viewSynthese(P);
+  $("#view").innerHTML = tab === "comptes" ? viewComptes(P) : tab === "positions" ? viewPositions(P) : tab === "immobilier" ? viewImmo(P) : tab === "budget" ? viewBudget() : viewSynthese(P);
   document.querySelectorAll(".tab").forEach((t) => t.setAttribute("aria-current", t.dataset.tab === tab ? "page" : "false"));
   if (sheet && sheet.live) openSheet(sheet, true);
   else if (pendingOpen) openPending();
@@ -981,7 +1267,7 @@ function openForm(kind, data, extra) {
 function goBack() { const b = sheet?.back; if (b) openSheet(b); else closeSheet(); }
 
 function setTab(t) {
-  tab = ["synthese", "comptes", "positions", "immobilier"].includes(t) ? t : "synthese";
+  tab = ["synthese", "comptes", "positions", "immobilier", "budget"].includes(t) ? t : "synthese";
   if (location.hash.slice(1) !== tab) { try { history.replaceState(null, "", "#" + tab); } catch {} }
   render(); window.scrollTo(0, 0);
 }
@@ -990,6 +1276,9 @@ document.addEventListener("click", async (e) => {
   const sb = e.target.closest("[data-env]"); if (sb) { env = sb.dataset.env; return render(); }
   const pf = e.target.closest("[data-profile]"); if (pf) { profile = pf.dataset.profile; try { localStorage.setItem("socle-profil", profile); } catch { } window.scrollTo(0, 0); return render(); }
   if (e.target.closest("#eye")) { discret = !discret; try { localStorage.setItem("socle-discret", discret ? "1" : "0"); } catch { } eyeIcon(); return render(); }
+  const bm = e.target.closest("[data-bmonth]"); if (bm) { bMonth = shiftM(bMonth, Number(bm.dataset.bmonth)); bCat = null; return render(); }
+  const bs = e.target.closest("[data-bscope]"); if (bs) { bScope = bs.dataset.bscope; bCat = null; return render(); }
+  const bc = e.target.closest("[data-bcat]"); if (bc) { bCat = bCat === bc.dataset.bcat ? null : bc.dataset.bcat; render(); document.querySelector(".txr, .dayh")?.closest("section")?.scrollIntoView({ behavior: "smooth", block: "start" }); return; }
   const ps = e.target.closest("[data-possort]"); if (ps) { posSort = ps.dataset.possort; return render(); }
   const rg = e.target.closest("[data-range]"); if (rg) { histRange = rg.dataset.range; return render(); }
   const se = e.target.closest("[data-series]"); if (se) { histSeries = se.dataset.series; return render(); }
@@ -998,7 +1287,11 @@ document.addEventListener("click", async (e) => {
   const id = t.dataset.id, act = t.dataset.act;
   const find = (col) => S[col].find((x) => x.id === id);
   if (act === "close") return sheet?.back ? goBack() : closeSheet();
-  if (!S.writable && /^(new|edit)-|^monthly$/.test(act)) return;
+  if (!S.writable && /^(new|edit)-|^monthly$|^tx-/.test(act)) return;
+  if (act === "tx-new") return openSheet({ html: sheetTx(null) });
+  if (act === "tx-edit") { const x = R.tx.find((y) => y.id === id); return x && openSheet({ html: sheetTx(x) }); }
+  if (act === "tx-import") { bImport = null; return openSheet({ html: sheetImport() }); }
+  if (act === "tx-import-run") return runImport(t);
   if (act === "open-account") openSheet({ type: "account", id, live: true });
   else if (act === "open-property") openSheet({ type: "property", id, live: true });
   else if (act === "monthly") openSheet({ html: sheetMonthly() });
@@ -1024,6 +1317,7 @@ document.addEventListener("submit", async (e) => {
   e.preventDefault();
   const form = e.target, kind = form.dataset.kind, id = form.dataset.id || null, parent = form.dataset.parent || null;
   if (kind === "monthly") return saveMonthly(form);
+  if (kind === "tx") return saveTx(form);
   const data = readForm(form);
   if (kind === "holding") data.accountId = parent;
   if (kind === "loan") data.propertyId = parent;
