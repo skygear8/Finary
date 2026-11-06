@@ -227,8 +227,8 @@ button.cal-d { border: 0; font: inherit; color: inherit; cursor: pointer; }
 .cal-day { width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; font-size: 12px; font-weight: 600; background: color-mix(in srgb, var(--accent) 14%, transparent); flex: none; }
 details.fold > summary::after { content: ""; width: 8px; height: 8px; border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted); transform: rotate(45deg) translate(-2px, -2px); justify-self: center; transition: transform 0.2s; }
 details.fold[open] > summary::after { transform: rotate(-135deg) translate(-2px, -2px); }
-details.fold > summary b { font: 600 16px var(--font-display); white-space: nowrap; }
-details.fold > summary b small { font: 500 12px var(--font-body); color: var(--muted); }
+details.fold > summary > b { font: 600 16px var(--font-display); white-space: nowrap; }
+details.fold > summary > b small { font: 500 12px var(--font-body); color: var(--muted); }
 .fold-t { display: grid; gap: 2px; min-width: 0; }
 .fold-t h2 { font-size: 15px; }
 details.fold[open] { padding-bottom: 14px; }
@@ -314,7 +314,7 @@ h2 { font-size: 18px; }
 .tile .v { font-weight: 500; font-size: 22px; letter-spacing: -0.02em; }
 .panel, details.fold { border: 1px solid var(--line); box-shadow: none; border-radius: 22px; }
 details.fold .panel { border-color: var(--line); }
-details.fold > summary b { font-weight: 500; font-size: 17px; }
+details.fold > summary > b { font-weight: 500; font-size: 17px; }
 .fold-t h2, details.fold .fold-t h2 { font-family: var(--font-body); font-weight: 700; font-size: 14.5px; letter-spacing: 0; }
 .bar { height: 5px; }
 .bar > i { background: var(--accent); }
@@ -340,6 +340,38 @@ details.fold > summary b { font-weight: 500; font-size: 17px; }
 .cal-day { background: color-mix(in srgb, var(--accent) 12%, transparent); }
 .warn { color: var(--gold); }
 .sheet { border-radius: 26px 26px 0 0; }
+
+/* ---- Parcours : volets groupés, barre de profils fixée, retours tactiles ---- */
+.stack-s { gap: 8px; margin-top: 22px; }
+.stack-s > .eyebrow { padding-left: 4px; }
+.stack { background: var(--surface); border: 1px solid var(--line); border-radius: 22px; overflow: hidden; }
+.stack > details.fold { margin: 0; border: 0; border-radius: 0; box-shadow: none; background: none; padding: 0 16px; }
+.stack > details.fold + details.fold { border-top: 1px solid var(--line); }
+.stack > details.fold > summary { padding: 14px 0; }
+.stack > details.fold[open] { background: color-mix(in srgb, var(--sunk) 45%, transparent); padding-bottom: 16px; }
+.stack > details.fold .panel { background: var(--surface); }
+.stack details.fold > summary > b { font-size: 16px; }
+details.fold > summary > b:empty { display: none; }
+details.fold > summary:has(b:empty) { grid-template-columns: minmax(0, 1fr) 18px; }
+.pbar { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 15; margin-inline: calc(-1 * max(16px, env(safe-area-inset-left, 0px))); padding: 8px max(16px, env(safe-area-inset-left, 0px)); background: color-mix(in srgb, var(--bg) 86%, transparent); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 16; background: var(--bg); }
+.pbar .profiles { margin-top: 0; background: var(--surface); }
+.prof .av-s { display: none; }
+.prof { padding: 9px 6px; }
+.brand { min-height: 36px; }
+.status:empty { display: none; }
+.kv div > span:last-child:not(:first-child) { white-space: nowrap; text-align: right; }
+.seg { flex-wrap: nowrap; }
+.btn, .seg-b, .chip, .prof, .tab, .row, .goal, .catrow, .eye, .x { transition: transform .12s ease, background-color .15s; -webkit-tap-highlight-color: transparent; }
+.btn:active, .seg-b:active, .chip:active, .prof:active, .tab:active, .eye:active, .x:active { transform: scale(0.96); }
+.row:active, .goal:active, .catrow:active, details.fold > summary:active { background: color-mix(in srgb, var(--sunk) 70%, transparent); }
+.row { border-radius: 10px; }
+.panel.empty { padding: 18px 14px; }
+.section-head .note { text-align: right; }
+.seg.acts { flex-wrap: wrap; gap: 6px; }
+.seg.acts .seg-b { background: transparent; border-style: dashed; font-size: 13px; padding: 6px 12px; }
+.seg.acts .seg-b::after { content: " ›"; color: var(--muted); }
+details.fold > summary .note b { font-family: var(--font-body); font-weight: 700; }
 </style>
 
 <div class="wrap">
@@ -347,7 +379,7 @@ details.fold > summary b { font-weight: 500; font-size: 17px; }
     <b><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5 15 14.5H1z" fill="var(--gold)"/></svg>Socle</b>
     <span class="head-r"><span class="status" id="status">Chargement…</span><button class="eye" id="eye" type="button" aria-pressed="false" aria-label="Masquer les montants" title="Masquer les montants"></button></span>
   </header>
-  <div class="profiles" id="profiles" role="tablist" aria-label="Profil"></div>
+  <div class="pbar"><div class="profiles" id="profiles" role="tablist" aria-label="Profil"></div></div>
   <main id="view"></main>
 </div>
 
@@ -578,9 +610,8 @@ function viewSynthese(P) {
     ${tile("Plus-values latentes", fE(P.accRows.reduce((s, a) => s + a.hs.reduce((t, h) => t + h.qty * (h.price - h.pru), 0), 0)), "Bourse et crypto", tone(P.accRows.reduce((s, a) => s + a.hs.reduce((t, h) => t + h.qty * (h.price - h.pru), 0), 0)))}
   </div>
   <div class="section"><div class="panel monthly"><span><b>Mise à jour du mois</b><div class="note">${lastUpdateText()}</div></span><button class="btn" data-act="monthly">Mettre à jour</button></div></div>
-  ${healthSection(P)}
+  ${stack("En un coup d'œil", [healthSection(P), agendaSection(P)])}
   ${goalsSection(P)}
-  ${agendaSection(P)}
   <section class="section">
     <h2>Répartition</h2>
     <div class="panel alloc">${donut(P.alloc)}<div class="legend">${P.alloc.map((a) => `<div><span class="dot" style="background:var(--c-${a.key})"></span><span>${a.label}</span><span class="pct">${fP((a.value / P.assets) * 100, 1)}</span><b>${fE(a.value)}</b></div>`).join("")}</div></div>
@@ -597,17 +628,16 @@ function viewSynthese(P) {
       <div><span class="note">Versements notés sur tes placements : ${fE(dec.flows)}. La performance = variation des placements moins ces versements.</span></div>
     </div>` : ""}
   </section>
-  <div class="section-head" style="margin-top:28px"><h2 class="h-lg">Analyses</h2><span class="note">touche pour déplier</span></div>
-  ${projSection(P)}
-  ${fireSection(P)}
-  ${benchSection(P)}
-  ${rebalSection(P)}
-  ${ytdTable(P)}
-  ${costTable(P)}
-  ${passiveSection(P)}
-  ${feesTable(P)}
-  ${taxSection(P)}
-  ${taxIRSection(P)}`;
+  <div class="section-head" style="margin-top:30px"><h2 class="h-lg">Analyses</h2></div>
+  ${profile === "sci" ? "" : `<div class="seg acts" style="margin-top:10px"><button class="seg-b" data-act="sim">Et si j'achète ?</button><button class="seg-b" data-act="year">Bilan de l'année</button></div>`}
+  ${stack("Ton avenir", [projSection(P), fireSection(P)])}
+  ${stack("Performance", [benchSection(P), ytdTable(P), costTable(P), passiveSection(P), rebalSection(P)])}
+  ${stack("Frais et impôts", [feesTable(P), taxSection(P), taxIRSection(P)])}`;
+}
+// regroupe des volets repliables dans une seule carte, sous un petit titre
+function stack(title, parts) {
+  const html = parts.filter((x) => x && x.trim()).join("");
+  return html ? `<section class="section stack-s"><div class="eyebrow">${title}</div><div class="stack">${html}</div></section>` : "";
 }
 // ce que tu as mis (prix d'achat, PRU, apport) face à ce que ça vaut aujourd'hui
 function costTable(P) {
@@ -1081,7 +1111,7 @@ function viewBudget() {
   <section class="hero budget-hero">
     <div class="mnav"><button class="mbtn" data-bmonth="-1" aria-label="Mois précédent">‹</button><div class="eyebrow">${monthName(bMonth)}</div><button class="mbtn" data-bmonth="1" aria-label="Mois suivant" ${bMonth >= today ? "disabled" : ""}>›</button></div>
     <div class="big">${cur.length ? (T.rest >= 0 ? "+" : "−") + fE(Math.abs(T.rest)) : "—"}</div>
-    <div class="sub">${cur.length ? `reste après dépenses · ${rate != null ? `<span class="chip-d">${fP(rate, 0)} épargné</span>` : ""}` : "aucune opération ce mois-ci"}</div>
+    <div class="sub">${cur.length ? `reste après dépenses${rate != null ? " · " : ""}${rate != null ? `<span class="chip-d">${fP(rate, 0)} épargné</span>` : ""}` : "aucune opération ce mois-ci"}</div>
   </section>`;
   if (!R.tx.length) return head + `
   <div class="section">${scopeSeg}</div>
@@ -1096,7 +1126,7 @@ function viewBudget() {
     ${tile("Taux d'épargne", rate != null ? fP(rate, 0) : "—", "part des revenus non dépensée", rate != null ? tone(rate) : "")}
   </div>
   <div class="section">${scopeSeg}</div>
-  <div class="section actions"><button class="btn ghost sm" data-act="report">Rapport du mois</button><button class="btn ghost sm" data-act="year">Bilan de l'année</button><button class="btn ghost sm" data-act="budget-settings">Réglages</button></div>
+  <div class="seg acts" style="margin-top:10px"><button class="seg-b" data-act="report">Rapport du mois</button><button class="seg-b" data-act="year">Bilan de l'année</button><button class="seg-b" data-act="budget-settings">Réglages</button></div>
   ${forecastSection(D, balRows)}
   ${envelopeSection(D)}
   <section class="section"><div class="section-head"><h2>Où part l'argent</h2><span class="total">${over ? `<span class="pill overp">${over} plafond${over > 1 ? "s" : ""} dépassé${over > 1 ? "s" : ""}</span> ` : ""}${fE(T.out)}</span></div>
@@ -1104,11 +1134,8 @@ function viewBudget() {
       <span class="dot" style="background:${col}"></span><span class="cn">${l}<small>${cap ? `plafond ${fE(cap)}${ct === "over" ? ` · <b>+${fE(v - cap)}</b>` : ` · reste ${fE(cap - v)}`}` : a != null ? `moy. ${fE(-a)}` : ""}</small></span><span class="cv">${fE(v)}<small>${cap ? fP((v / cap) * 100, 0) + " du plafond" : T.out ? fP((v / T.out) * 100, 0) : ""}</small></span>
       <span class="bar"><i style="width:${(cap ? Math.min(100, (v / cap) * 100) : (v / maxCat) * 100).toFixed(1)}%;background:${ct === "over" ? "var(--loss)" : ct === "near" ? "#d9822b" : col}"></i></span></button>`; }).join("") || `<div class="empty">Aucune dépense ce mois-ci.</div>`}
       ${S.writable ? `<button class="btn ghost sm" data-act="tx-caps" style="margin:6px 4px 2px;justify-self:start">${Object.keys(capsRaw(bScope)).length ? "Modifier les plafonds" : "Fixer des plafonds"}${bScope === "joint" ? " du joint" : bScope === "perso" ? " perso" : ""}</button>` : ""}</div></section>
-  ${compareSection(series, D)}
-  ${recurringSection(D)}
-  ${jointSection(D)}
-  ${challengesSection(D)}
-  ${costsSection(D)}
+  ${stack("Ce mois-ci", [compareSection(series, D), recurringSection(D), jointSection(D)])}
+  ${stack("Pour aller plus loin", [challengesSection(D), costsSection(D)])}
   <section class="section"><div class="section-head"><h2>12 derniers mois</h2><span class="note"><span class="dot" style="display:inline-block;background:var(--gold)"></span> revenus <span class="dot" style="display:inline-block;background:var(--accent);margin-left:6px"></span> dépenses</span></div>
     <div class="panel">${budgetBars(series)}</div></section>
   <section class="section"><h2>Comptes courants</h2><div class="panel list">${balRows.map(balRow).join("")}</div></section>
@@ -1385,7 +1412,7 @@ function goalsSection(P) {
   const sugg = `<div class="seg" style="margin-top:8px;flex-wrap:wrap">
       ${goals.some((g) => g.kind === "wealth") ? "" : `<button class="seg-b" data-act="goal-new-kind" data-kind="wealth">+ 1 M€ de patrimoine</button>`}
       ${goals.some((g) => g.kind === "immo") ? "" : `<button class="seg-b" data-act="goal-new-kind" data-kind="immo">+ Projet immobilier</button>`}
-      <button class="seg-b" data-act="sim">Et si j'achète ?</button><button class="seg-b" data-act="year">Bilan de l'année</button></div>` + (goals.length ? "" : `<div class="seg" style="margin-top:6px">
+      </div>` + (goals.length ? "" : `<div class="seg" style="margin-top:6px">
       ${livA ? `<button class="seg-b" data-act="new-goal" data-preset='${esc(JSON.stringify({ name: "Livret A au plafond", target: 22950, accounts: [livA.id] }))}'>+ Livret A au plafond</button>` : ""}
       ${av ? `<button class="seg-b" data-act="new-goal" data-preset='${esc(JSON.stringify({ name: "Réserve de 6 mois de dépenses", target: Math.round(av.out * 6 / 100) * 100, accounts: liq }))}'>+ Réserve de 6 mois</button>` : ""}</div>`);
   if (profile === "sci") return "";
@@ -2182,7 +2209,7 @@ function costsSection(D) {
   };
   const html = block("Voiture", car, `<div><span class="note">Leasing ou crédit, assurance, carburant, péages, parking et entretien. Les transports en commun sont exclus.</span></div>`) + block("Logement", home, `<div><span class="note">Loyer, énergie, assurance habitation, eau et charges.</span></div>`);
   if (!html) return "";
-  return `<details class="section fold" data-fold="costs" ${openFolds.has("costs") ? "open" : ""}><summary><span class="fold-t"><h2>Coût réel voiture et logement</h2><span class="note">moyenne sur ${ms.length} mois · ${bScope === "all" ? "tous les comptes" : bScope === "joint" ? "compte joint" : "comptes perso"}</span></span><b>›</b></summary>${html}</details>`;
+  return `<details class="section fold" data-fold="costs" ${openFolds.has("costs") ? "open" : ""}><summary><span class="fold-t"><h2>Coût réel voiture et logement</h2><span class="note">moyenne sur ${ms.length} mois · ${bScope === "all" ? "tous les comptes" : bScope === "joint" ? "compte joint" : "comptes perso"}</span></span><b></b></summary>${html}</details>`;
 }
 
 // ---- défis d'épargne : settings[profil].challenges ----
@@ -2205,7 +2232,7 @@ function challengesSection(D) {
   if (profile === "sci" || profile === "foyer") return "";
   const chs = chOf();
   const body = chs.length ? `<div class="panel list">${chs.map((c, i) => { const r = challengeCalc(c, D); return `<div class="row" style="cursor:default"><span><div class="name">${r.ok ? "" : "✗ "}${esc(r.title)}</div><div class="meta">${r.status}</div></span><span class="amt">${c.type === "roundup" && r.round > 0 && S.writable ? `<button class="btn sm" data-act="ch-roundup" data-i="${i}">C'est viré</button>` : ""}${S.writable ? `<button class="pill" data-act="ch-stop" data-i="${i}" aria-label="Arrêter le défi">×</button>` : ""}</span></div>`; }).join("")}</div>` : "";
-  return `<details class="section fold" data-fold="ch" ${openFolds.has("ch") ? "open" : ""}><summary><span class="fold-t"><h2>Défis d'épargne</h2><span class="note">${chs.length ? `${chs.length} en cours` : "lance un défi pour économiser sans y penser"}</span></span><b>${chs.length ? fE(chs.reduce((s, c) => s + challengeCalc(c, D).saved, 0)) : "›"}</b></summary>
+  return `<details class="section fold" data-fold="ch" ${openFolds.has("ch") ? "open" : ""}><summary><span class="fold-t"><h2>Défis d'épargne</h2><span class="note">${chs.length ? `${chs.length} en cours` : "lance un défi pour économiser sans y penser"}</span></span><b>${chs.length ? fE(chs.reduce((s, c) => s + challengeCalc(c, D).saved, 0)) : ""}</b></summary>
     ${body}
     ${S.writable ? `<div class="actions" style="margin-top:8px;flex-wrap:wrap">${["resto", "shopping", "loisirs"].map((c) => `<button class="btn ghost sm" data-act="ch-start" data-type="nocat" data-cat="${c}">Pas de ${BCATS[c][0].toLowerCase()} 7 jours</button>`).join("")}${chs.some((c) => c.type === "roundup") ? "" : `<button class="btn ghost sm" data-act="ch-start" data-type="roundup">Arrondi à l'euro supérieur</button>`}</div>` : ""}
     <p class="note" style="margin-top:6px">« Pas de… » : l'économie = ta dépense moyenne dans la catégorie sur la période, moins ce que tu as dépensé. « Arrondi » : chaque dépense arrondie à l'euro supérieur ; vire la différence sur ton Livret A puis touche « C'est viré ».</p></details>`;
@@ -2553,6 +2580,11 @@ function showErr(err) {
     err?.code === "invalid_argument" ? "Tu peux consulter ce Socle mais pas le modifier." : "Enregistrement impossible pour le moment. Réessaie dans un instant.";
 }
 document.addEventListener("keydown", (e) => { if (e.key === "Escape" && sheet) closeSheet(); });
+// glisser la feuille vers le bas pour la fermer (depuis la poignée ou quand elle est déjà en haut)
+let drag = null;
+document.addEventListener("touchstart", (e) => { const sh = e.target.closest(".sheet"); if (!sh || (sh.scrollTop > 0 && !e.target.closest(".grab"))) return; drag = { sh, y: e.touches[0].clientY, dy: 0 }; }, { passive: true });
+document.addEventListener("touchmove", (e) => { if (!drag) return; drag.dy = Math.max(0, e.touches[0].clientY - drag.y); if (drag.dy > 0 && drag.sh.scrollTop <= 0) { drag.sh.style.transition = "none"; drag.sh.style.translate = `0 ${drag.dy}px`; } }, { passive: true });
+document.addEventListener("touchend", () => { if (!drag) return; const { sh, dy } = drag; drag = null; sh.style.transition = "translate .18s ease-out"; if (dy > 110) closeSheet(); else sh.style.translate = "0 0"; });
 window.addEventListener("hashchange", () => setTab(location.hash.slice(1)));
 
 /* ---------------- Démarrage ---------------- */
@@ -2568,7 +2600,7 @@ setTab(location.hash.slice(1));
     db.collection(col).onSnapshot((snap) => {
       R[col] = snap.docs.map((d) => ({ id: d.id, ...d.data() })); applyProfile();
       if (!snap.metadata.fromCache) got.add(col);
-      if (got.size === COLS.length && !S.ready) { S.ready = true; clearTimeout(timer); status.textContent = S.writable ? "Enregistré dans Claude" : "Lecture seule"; snapshotToday(); applyPlans(); }
+      if (got.size === COLS.length && !S.ready) { S.ready = true; clearTimeout(timer); status.textContent = S.writable ? "" : "Lecture seule"; snapshotToday(); applyPlans(); }
       render();
     }, () => { clearTimeout(timer); status.textContent = "Données indisponibles"; });
   }
