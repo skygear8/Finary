@@ -217,6 +217,7 @@ details.fold > summary::-webkit-details-marker { display: none; }
 .cal-d.has.paid { background: color-mix(in srgb, var(--gain) 13%, transparent); }
 button.cal-d { border: 0; font: inherit; color: inherit; cursor: pointer; }
 .cal-d.sel { outline: 2px solid var(--accent); background: color-mix(in srgb, var(--accent) 26%, transparent); }
+.cal-bar { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 10px; }
 .linkb { border: 0; background: none; padding: 0; font: inherit; color: var(--accent); text-decoration: underline; cursor: pointer; }
 .cal-d.today { outline: 1.5px solid var(--accent); }
 .cal-d b { font-size: 10.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
@@ -1264,9 +1265,10 @@ function recurringSection(D) {
   const shown = calDay ? byDay[calDay] : due;
   const dueTot = due.reduce((s, r) => s + r.amt, 0), left = due.filter((r) => !r.paid).reduce((s, r) => s + r.amt, 0);
   return `<details class="section fold" data-fold="recur" ${openFolds.has("recur") ? "open" : ""}><summary><span class="fold-t"><h2>Paiements récurrents</h2><span class="note">${rec.length} repérés · ${fE(tot)} par mois en moyenne</span></span><b>${fE(tot * 12)}<small> /an</small></b></summary>
+    <div class="cal-bar"><button class="btn sm${calDay ? " ghost" : ""}" data-calall="month" aria-pressed="${!calDay}">Tous les prélèvements ${isCur ? "du mois en cours" : "de " + monthName(bMonth)}</button>${isCur ? "" : `<button class="btn ghost sm" data-calall="now">Mois en cours</button>`}</div>
     <div class="cal"><div class="cal-h">${["L", "M", "M", "J", "V", "S", "D"].map((x) => `<span>${x}</span>`).join("")}</div><div class="cal-g">${cells}</div></div>
     <p class="note">${calDay ? `<b>${calDay} ${monthName(bMonth)}</b> : ${fE(byDay[calDay].reduce((s, r) => s + r.amt, 0))} · <button class="linkb" data-calday="${calDay}">voir tout le mois</button>` : `${monthName(bMonth)} : ${fE(dueTot)} prélevés`}${left > 0 && left < dueTot ? `, dont ${fE(left)} encore à venir` : left === dueTot && dueTot ? ", tout encore à venir" : ""}${calDay ? "" : ". Touche un jour pour voir ses prélèvements."}</p>
-    <div class="panel list">${shown.map((r) => `<button class="row txr" data-act="tx-edit" data-id="${r.id}"><span class="txl"><span class="cal-day">${r.day}</span><span style="min-width:0"><div class="name">${esc(r.label)}</div><div class="meta">${BCATS[r.c][0]}${r.annual ? " · annuel" : ""}${r.paid ? " · prélevé ✓" : " · à venir"}</div></span></span><span class="amt">${fE2(r.amt)}<small>${fE(r.perMonth * 12)} /an</small></span></button>`).join("") || `<div class="empty">Aucune échéance ce mois-ci.</div>`}</div>
+    <div class="panel list">${shown.map((r) => `<button class="row txr" data-act="tx-edit" data-id="${r.id}"><span class="txl"><span class="cal-day">${r.day}</span><span style="min-width:0"><div class="name">${esc(r.label)}</div><div class="meta">${BCATS[r.c][0]}${r.annual ? " · annuel" : ""}${r.paid ? " · prélevé ✓" : isCur && r.day <= todayD.getDate() ? " · pas encore sur tes relevés" : " · à venir"}</div></span></span><span class="amt">${fE2(r.amt)}<small>${fE(r.perMonth * 12)} /an</small></span></button>`).join("") || `<div class="empty">Aucune échéance ce mois-ci.</div>`}</div>
     <p class="note">Dates déduites du dernier prélèvement. Pour retirer un paiement de la liste ou le marquer annuel, ouvre-le et coche l'option.</p></details>`;
 }
 // épargne nette mensuelle moyenne (budget) : base des objectifs et de la projection
@@ -1552,6 +1554,7 @@ document.addEventListener("click", async (e) => {
   const pf = e.target.closest("[data-profile]"); if (pf) { profile = pf.dataset.profile; try { localStorage.setItem("socle-profil", profile); } catch { } window.scrollTo(0, 0); return render(); }
   if (e.target.closest("#eye")) { discret = !discret; try { localStorage.setItem("socle-discret", discret ? "1" : "0"); } catch { } eyeIcon(); return render(); }
   const bm = e.target.closest("[data-bmonth]"); if (bm) { bMonth = shiftM(bMonth, Number(bm.dataset.bmonth)); bCat = null; calDay = null; return render(); }
+  const ca = e.target.closest("[data-calall]"); if (ca) { calDay = null; if (ca.dataset.calall === "now") bMonth = new Date().toISOString().slice(0, 7); openFolds.add("recur"); return render(); }
   const cd = e.target.closest("[data-calday]"); if (cd) { const d = Number(cd.dataset.calday); calDay = calDay === d ? null : d; openFolds.add("recur"); return render(); }
   const bs = e.target.closest("[data-bscope]"); if (bs) { bScope = bs.dataset.bscope; bCat = null; return render(); }
   const bc = e.target.closest("[data-bcat]"); if (bc) { bCat = bCat === bc.dataset.bcat ? null : bc.dataset.bcat; render(); document.querySelector(".txr, .dayh")?.closest("section")?.scrollIntoView({ behavior: "smooth", block: "start" }); return; }
