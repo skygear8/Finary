@@ -1013,7 +1013,7 @@ function viewBudget() {
     <div class="panel cats">${cats.map(({ c, v, cap }) => { const a = avg(c), [l, , col] = BCATS[c], ct = capTone(v, cap); return `<button class="catrow ${ct}" data-bcat="${c}" aria-pressed="${bCat === c}">
       <span class="dot" style="background:${col}"></span><span class="cn">${l}<small>${cap ? `plafond ${fE(cap)}${ct === "over" ? ` · <b>+${fE(v - cap)}</b>` : ` · reste ${fE(cap - v)}`}` : a != null ? `moy. ${fE(-a)}` : ""}</small></span><span class="cv">${fE(v)}<small>${cap ? fP((v / cap) * 100, 0) + " du plafond" : T.out ? fP((v / T.out) * 100, 0) : ""}</small></span>
       <span class="bar"><i style="width:${(cap ? Math.min(100, (v / cap) * 100) : (v / maxCat) * 100).toFixed(1)}%;background:${ct === "over" ? "var(--loss)" : ct === "near" ? "#d9822b" : col}"></i></span></button>`; }).join("") || `<div class="empty">Aucune dépense ce mois-ci.</div>`}
-      ${S.writable ? `<button class="btn ghost sm" data-act="tx-caps" style="margin:6px 4px 2px;justify-self:start">${Object.keys(caps).length ? "Modifier les plafonds" : "Fixer des plafonds"}</button>` : ""}</div></section>
+      ${S.writable ? `<button class="btn ghost sm" data-act="tx-caps" style="margin:6px 4px 2px;justify-self:start">${Object.keys(capsRaw(bScope)).length ? "Modifier les plafonds" : "Fixer des plafonds"}${bScope === "joint" ? " du joint" : bScope === "perso" ? " perso" : ""}</button>` : ""}</div></section>
   ${recurringSection(D)}
   <section class="section"><div class="section-head"><h2>12 derniers mois</h2><span class="note"><span class="dot" style="display:inline-block;background:var(--gold)"></span> revenus <span class="dot" style="display:inline-block;background:var(--accent);margin-left:6px"></span> dépenses</span></div>
     <div class="panel">${budgetBars(series)}</div></section>
@@ -1166,26 +1166,37 @@ document.addEventListener("change", async (e) => {
 
 /* ---------------- Plafonds, abonnements, objectifs, projection, fiscalité ---------------- */
 // plafonds : collection caps {profile, cat, amount} (id profil_cat)
-const capsOf = () => Object.fromEntries(R.caps.filter((c) => c.profile === profile && c.amount > 0).map((c) => [c.cat, c.amount]));
+// scope : "all" (défaut, ancien format), "perso" (par profil) ou "joint" (commun à tous les profils)
+const capId = (sc, c) => sc === "joint" ? `joint_${c}` : sc === "perso" ? `${profile}_perso_${c}` : `${profile}_${c}`;
+const capsRaw = (sc) => Object.fromEntries(R.caps.filter((c) => c.amount > 0 && (c.scope || "all") === sc && (sc === "joint" || c.profile === profile)).map((c) => [c.cat, c.amount]));
+function capsOf(sc = bScope) {
+  if (sc !== "all") return capsRaw(sc);
+  const own = capsRaw("all");
+  if (Object.keys(own).length) return own;
+  const p = capsRaw("perso"), j = capsRaw("joint"), sum = {};
+  for (const o of [p, j]) for (const [c, v] of Object.entries(o)) sum[c] = (sum[c] || 0) + v;
+  return sum;
+}
+const capScopeLabel = (sc) => sc === "joint" ? "compte joint, commun aux deux profils" : sc === "perso" ? `comptes perso de ${PROFILES.find((p) => p.k === profile).label}` : `tous les comptes, profil ${PROFILES.find((p) => p.k === profile).label}`;
 const capTone = (v, cap) => !cap ? "" : v > cap ? "over" : v >= cap * 0.85 ? "near" : "ok";
 function sheetCaps(avgs) {
-  const caps = capsOf();
+  const caps = capsRaw(bScope);
   return `<div class="sheet-head"><h2>Plafonds mensuels</h2><button class="x" data-act="close" aria-label="Fermer">×</button></div>
   <form class="f" data-kind="caps">
-    <p class="note">Un plafond par catégorie de dépenses (profil ${PROFILES.find((p) => p.k === profile).label}). Laisse vide pour ne pas en mettre. La suggestion grisée est ta moyenne.</p>
+    <p class="note">Plafonds pour : <b>${capScopeLabel(bScope)}</b>. Change d'onglet (Tout, perso, joint) pour fixer des plafonds différents.${bScope === "all" ? " Sans plafond ici, la vue Tout additionne les plafonds perso et joint." : ""} Laisse vide pour ne pas en mettre. La suggestion grisée est ta moyenne sur ces comptes.</p>
     <fieldset>${Object.entries(BCATS).filter(([, [, k]]) => k === "out").map(([c, [l]]) => `<label>${l}<input name="${c}" inputmode="decimal" value="${caps[c] ?? ""}" placeholder="${avgs[c] ? "moy. " + Math.round(avgs[c] / 10) * 10 : ""}"></label>`).join("")}</fieldset>
     <p class="err" id="form-err" hidden></p>
     <div class="actions"><button class="btn" type="submit">Enregistrer</button></div>
   </form>`;
 }
 async function saveCaps(form) {
-  const fd = new FormData(form), btn = form.querySelector("[type=submit]"), old = capsOf();
+  const fd = new FormData(form), btn = form.querySelector("[type=submit]"), sc = bScope, old = capsRaw(sc);
   btn.disabled = true; btn.textContent = "Enregistrement…";
   try {
     for (const [c, [, k]] of Object.entries(BCATS)) {
       if (k !== "out") continue;
-      const v = String(fd.get(c) ?? "").trim(), id = `${profile}_${c}`;
-      if (v && num(v) > 0) { if (num(v) !== old[c]) await db.collection("caps").doc(id).set({ profile, cat: c, amount: num(v) }); }
+      const v = String(fd.get(c) ?? "").trim(), id = capId(sc, c);
+      if (v && num(v) > 0) { if (num(v) !== old[c]) await db.collection("caps").doc(id).set({ profile: sc === "joint" ? "joint" : profile, scope: sc, cat: c, amount: num(v) }); }
       else if (old[c]) await db.collection("caps").doc(id).delete();
     }
     closeSheet();
