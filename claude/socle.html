@@ -1132,7 +1132,7 @@ document.addEventListener("change", async (e) => {
   try {
     const buf = await e.target.files[0].arrayBuffer();
     let text = new TextDecoder("utf-8").decode(buf);
-    if (text.includes("�")) text = new TextDecoder("windows-1252").decode(buf);
+    if (text.includes("\uFFFD")) text = new TextDecoder("windows-1252").decode(buf);
     const rows = parseBankCSV(text);
     bImport = { acc, rows, ids: txIds(acc, rows) };
   } catch (err) { bImport = { acc, err: err.message || "Fichier illisible." }; }
