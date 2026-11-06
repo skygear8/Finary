@@ -1005,7 +1005,7 @@ function balRow(r) {
 }
 function txRow(t) {
   const [l, k, col] = BCATS[t.c];
-  return `<button class="row txr" data-act="tx-edit" data-id="${t.id}"><span class="txl"><span class="dot" style="background:${col}"></span><span style="min-width:0"><div class="name">${esc(t.label)}</div><div class="meta">${isFortuneoSaving(t) && t.c === "epargne" ? "Épargne : 300 € PEA + 300 € Livret A" : l + (t.cat ? "" : " · auto")} · ${esc(accLabel(t.accountId))}</div></span></span>
+  return `<button class="row txr" data-act="tx-edit" data-id="${t.id}"><span class="txl"><span class="dot" style="background:${col}"></span><span style="min-width:0"><div class="name">${esc(t.label)}</div><div class="meta">${isFortuneoSaving(t) && t.c === "epargne" ? "Épargne : 300 € PEA + 300 € Livret A" : t.note ? esc(t.note) : l + (t.cat ? "" : " · auto")} · ${esc(accLabel(t.accountId))}</div></span></span>
     <span class="amt ${t.amount > 0 ? "gain" : ""}" ${k === "int" ? 'style="color:var(--muted)"' : ""}>${t.amount > 0 ? "+" : "−"}${fE2(Math.abs(t.amount))}</span></button>`;
 }
 function budgetAccOptions(sel) {
