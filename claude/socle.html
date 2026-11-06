@@ -1047,6 +1047,7 @@ function sheetTx(t) {
       <label class="full">Compte<select name="accountId">${budgetAccOptions(d.accountId || (bScope === "joint" ? "joint" : ""))}</select></label>
       <label class="full">Catégorie<select name="cat"><option value="">Automatique${auto ? " (" + BCATS[auto][0] + ")" : ""}</option>${Object.entries(BCATS).map(([k, [l]]) => `<option value="${k}" ${t?.cat === k ? "selected" : ""}>${l}</option>`).join("")}</select></label>
       ${t && key ? `<label class="full chk"><input type="checkbox" name="learn" value="${esc(key)}"> Classer aussi les autres opérations « ${esc(key)} » dans cette catégorie</label>` : ""}
+      <label class="full chk"><input type="checkbox" name="annual" ${d.period === "an" ? "checked" : ""}> Abonnement annuel (compté 1/12 par mois dans les abonnements)</label>
       <label class="full">Note<input name="note" value="${esc(d.note || "")}"></label>
     </fieldset>
     <p class="err" id="form-err" hidden></p>
@@ -1055,7 +1056,7 @@ function sheetTx(t) {
 }
 async function saveTx(form) {
   const fd = new FormData(form), id = form.dataset.id || null, btn = form.querySelector("[type=submit]");
-  const data = { label: String(fd.get("label") || "").trim(), date: String(fd.get("date")), amount: num(fd.get("amount")), accountId: String(fd.get("accountId")), cat: String(fd.get("cat") || "") || null, note: String(fd.get("note") || "").trim() };
+  const data = { label: String(fd.get("label") || "").trim(), date: String(fd.get("date")), amount: num(fd.get("amount")), accountId: String(fd.get("accountId")), cat: String(fd.get("cat") || "") || null, note: String(fd.get("note") || "").trim(), period: fd.get("annual") ? "an" : null };
   btn.disabled = true; btn.textContent = "Enregistrement…";
   try {
     const learn = fd.get("learn");
@@ -1206,10 +1207,14 @@ async function saveCaps(form) {
 const RECUR_RE = /assurance|axa|maif|macif|matmut|lolivier|bank|credit|pret|loyer|lintot|gestion|syndic|edf|engie|veolia|mutuelle|telecom|bouygues|free|sfr|orange|sosh|netflix|spotify|deezer|disney|canal|prime|icloud|apple|google|anthropic|openai|finary|basic.?fit|fitness/;
 function recurring(D, endMonth) {
   const from = shiftM(endMonth, -2);
-  const out = D.tx.filter((t) => t.amount < 0 && ym(t.date) >= from && ym(t.date) <= endMonth && !["interne", "epargne", "courses", "resto"].includes(t.c));
-  const g = {};
-  for (const t of out) { const k = ruleKey(t.label) || normL(t.label); (g[k] ||= []).push(t); }
-  return Object.values(g).map((ts) => {
+  const yFrom = shiftM(endMonth, -11);
+  const out = D.tx.filter((t) => t.amount < 0 && ym(t.date) >= (t.period === "an" ? yFrom : from) && ym(t.date) <= endMonth && !["interne", "epargne", "courses", "resto"].includes(t.c));
+  const g = {}, yearly = [];
+  for (const t of out) {
+    if (t.period === "an") { const k = ruleKey(t.label) || normL(t.label), o = yearly.find((y) => y.k === k); if (!o || t.date > o.last) { if (o) yearly.splice(yearly.indexOf(o), 1); yearly.push({ k, label: t.label, c: t.c, perMonth: -t.amount / 12, last: t.date, n: 1, annual: -t.amount }); } continue; }
+    const k = ruleKey(t.label) || normL(t.label); (g[k] ||= []).push(t);
+  }
+  return [...yearly, ...Object.values(g).map((ts) => {
     ts.sort((a, b) => b.date.localeCompare(a.date));
     const months = new Set(ts.map((t) => ym(t.date))), last = ts[0], amts = ts.map((t) => -t.amount);
     const steady = months.size >= 2 && ts.length <= months.size + 1 && Math.max(...amts) <= Math.min(...amts) * 1.2;
@@ -1217,15 +1222,15 @@ function recurring(D, endMonth) {
     if (!steady && !known) return null;
     const perMonth = ts.length > months.size ? amts.reduce((a, b) => a + b, 0) / months.size : -last.amount;
     return { label: last.label, c: last.c, perMonth, last: last.date, n: months.size };
-  }).filter(Boolean).sort((a, b) => b.perMonth - a.perMonth);
+  })].filter(Boolean).sort((a, b) => b.perMonth - a.perMonth);
 }
 function recurringSection(D) {
   const rec = recurring(D, bMonth);
   if (!rec.length) return "";
   const tot = rec.reduce((s, r) => s + r.perMonth, 0);
   return `<details class="section fold"><summary><span class="fold-t"><h2>Abonnements et prélèvements</h2><span class="note">${rec.length} repérés · ${fE(tot)} par mois</span></span><b>${fE(tot * 12)}<small> /an</small></b></summary>
-    <div class="panel list">${rec.map((r) => `<div class="row" style="cursor:default"><span class="txl"><span class="dot" style="background:${BCATS[r.c][2]}"></span><span style="min-width:0"><div class="name">${esc(r.label)}</div><div class="meta">${BCATS[r.c][0]} · dernier le ${new Date(r.last).toLocaleDateString("fr-FR", { day: "numeric", month: "short" })}${r.n > 1 ? ` · ${r.n} mois` : ""}</div></span></span><span class="amt">${fE2(r.perMonth)}<small>${fE(r.perMonth * 12)} /an</small></span></div>`).join("")}</div>
-    <p class="note">Repérés d'après les libellés et les montants qui reviennent chaque mois. Les montants sont supposés mensuels.</p></details>`;
+    <div class="panel list">${rec.map((r) => `<div class="row" style="cursor:default"><span class="txl"><span class="dot" style="background:${BCATS[r.c][2]}"></span><span style="min-width:0"><div class="name">${esc(r.label)}</div><div class="meta">${BCATS[r.c][0]} · dernier le ${new Date(r.last).toLocaleDateString("fr-FR", { day: "numeric", month: "short" })}${r.annual ? ` · annuel, ${fE2(r.annual)} par an` : r.n > 1 ? ` · ${r.n} mois` : ""}</div></span></span><span class="amt">${fE2(r.perMonth)}<small>${fE(r.perMonth * 12)} /an</small></span></div>`).join("")}</div>
+    <p class="note">Repérés d'après les libellés et les montants qui reviennent chaque mois. Les montants sont supposés mensuels, sauf ceux marqués annuels (à cocher dans l'opération).</p></details>`;
 }
 // épargne nette mensuelle moyenne (budget) : base des objectifs et de la projection
 function avgSaving() {
