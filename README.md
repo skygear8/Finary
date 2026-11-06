@@ -1,36 +1,26 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Socle
 
-## Getting Started
+Application personnelle de suivi de patrimoine : comptes bancaires, épargne, bourse (PEA, CTO, assurance-vie, PER), crypto et immobilier détaillé (prêts, loyers, charges, rendement, cash-flow).
 
-First, run the development server:
+Tout tourne en local : les données restent dans `data/socle.db` (SQLite).
+
+## Démarrer
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+npm run seed   # optionnel : données de démonstration fictives (efface la base)
+npm run dev    # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Fonctionnalités
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- **Synthèse** : patrimoine net, brut, dettes, répartition, historique (photo quotidienne automatique).
+- **Comptes & placements** : liquidités, positions avec quantité, PRU, cours et plus-value latente.
+- **Immobilier** : coût d'acquisition, quote-part, valorisation, rendement brut et net, cash-flow, crédits avec capital restant dû et tableau d'amortissement.
+- **Import CSV** de positions (format décrit dans l'app).
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Stack
 
-## Learn More
+Next.js 15 (App Router, server actions), TypeScript, Tailwind CSS 4, Drizzle ORM + better-sqlite3, Recharts.
 
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Les calculs financiers sont dans `src/lib/finance.ts` et l'agrégation du patrimoine dans `src/lib/portfolio.ts`.

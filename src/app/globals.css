@@ -1,26 +1,46 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f6f7f9;
+  --surface: #ffffff;
+  --foreground: #16181d;
+  --muted: #6b7280;
+  --border: #e5e7eb;
+  --accent: #0f766e;
 }
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: #0d0f12;
+    --surface: #16191e;
+    --foreground: #e8eaed;
+    --muted: #9aa1ab;
+    --border: #262a31;
+    --accent: #2dd4bf;
   }
 }
-
+@theme inline {
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-border: var(--border);
+  --color-accent: var(--accent);
+}
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-variant-numeric: tabular-nums;
+}
+.input {
+  @apply w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm outline-none focus:border-accent;
+}
+.btn {
+  @apply inline-flex items-center justify-center rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white dark:text-black hover:opacity-90;
+}
+.btn-ghost {
+  @apply inline-flex items-center justify-center rounded-lg border border-border px-3 py-1.5 text-sm hover:bg-background;
+}
+.btn-danger {
+  @apply inline-flex items-center justify-center rounded-lg border border-rose-300 px-3 py-1.5 text-sm text-rose-600 hover:bg-rose-50 dark:border-rose-900 dark:hover:bg-rose-950;
 }
