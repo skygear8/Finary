@@ -154,6 +154,12 @@ input, select {
 .upd .name { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .upd input { text-align: right; }
 .upd input.changed { border-color: var(--accent); }
+.head-btns { display: flex; gap: 8px; align-items: center; flex: none; }
+.btn.sm { padding: 7px 12px; font-size: 13px; }
+.todo { background: var(--surface); border: 1px dashed var(--accent); border-radius: var(--r); padding: 12px 14px; margin-bottom: 12px; display: grid; gap: 8px; font-size: 14px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { appearance: none; border: 1px solid var(--line); background: var(--sunk); color: var(--fg); border-radius: 99px; padding: 5px 11px; font: 500 13px var(--font-body); cursor: pointer; }
+.chip::before { content: "+ "; color: var(--accent); font-weight: 700; }
 .monthly { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .banner { background: var(--sunk); border-radius: 12px; padding: 10px 12px; font-size: 13px; color: var(--muted); margin-top: 12px; }
 @media (prefers-reduced-motion: no-preference) {
@@ -403,10 +409,24 @@ function sheetAccount(a) {
   <div class="section actions"><button class="btn ghost" data-act="edit-account" data-id="${a.id}">Modifier le compte</button></div>`;
 }
 
+function missingProperty(p) {
+  const out = [];
+  if (!p.surface) out.push(["surface", "Surface"]);
+  if (!p.bought) out.push(["bought", "Date d'achat"]);
+  if (!p.notary) out.push(["notary", "Frais de notaire"]);
+  if (p.type !== "residence_principale") {
+    if (!p.rent) out.push(["rent", "Loyer"]);
+    if (!p.tax) out.push(["tax", "Taxe foncière"]);
+  }
+  if (!p.loans?.length) out.push(["__loan", "Crédit"]);
+  return out;
+}
 function sheetProperty(p) {
   const m = p.m;
   return `
-  <div class="sheet-head"><div><h2>${esc(p.name)}</h2><div class="note">${PROPERTY_TYPES[p.type] || ""}${p.city ? " · " + esc(p.city) : ""}${p.surface ? " · " + p.surface + " m² · " + fE(m.sqm) + "/m²" : ""}</div></div><button class="x" data-act="close" aria-label="Fermer">×</button></div>
+  <div class="sheet-head"><div><h2>${esc(p.name)}</h2><div class="note">${PROPERTY_TYPES[p.type] || ""}${p.city ? " · " + esc(p.city) : ""}${p.surface ? " · " + p.surface + " m² · " + fE(m.sqm) + "/m²" : ""}</div></div>
+    <div class="head-btns"><button class="btn ghost sm" data-act="edit-property" data-id="${p.id}">Paramétrer</button><button class="x" data-act="close" aria-label="Fermer">×</button></div></div>
+  ${missingProperty(p).length ? `<div class="todo"><b>À compléter pour des calculs justes</b><div class="chips">${missingProperty(p).map((x) => `<button class="chip" data-act="edit-property" data-id="${p.id}" data-focus="${x[0]}">${x[1]}</button>`).join("")}</div></div>` : ""}
   <div class="grid2">
     ${tile("Valeur estimée", fE(m.value), (p.share ?? 100) < 100 ? `quote-part ${p.share} % de ${fE(p.value)}` : "")}
     ${tile("Net de crédit", fE(m.equity))}
@@ -447,7 +467,7 @@ function sheetProperty(p) {
       </div>`;
     }).join("") || `<div class="panel empty">Aucun crédit sur ce bien.</div>`}
   </section>
-  <div class="section actions"><button class="btn ghost" data-act="edit-property" data-id="${p.id}">Modifier le bien</button></div>`;
+  <div class="section actions"><button class="btn ghost" data-act="edit-property" data-id="${p.id}">Paramétrer le bien</button></div>`;
 }
 
 function ago(iso) {
@@ -509,7 +529,7 @@ function formHtml(kind, data, extra) {
     return `<label class="${o.full ? "full" : ""}" for="${id}">${label}${input}</label>`;
   };
   return `
-  <div class="sheet-head"><h2>${data ? "Modifier" : "Ajouter"} : ${f.title.toLowerCase()}</h2><button class="x" data-act="close" aria-label="Fermer">×</button></div>
+  <div class="sheet-head"><h2>${data ? (kind === "property" ? "Paramètres du bien" : "Modifier : " + f.title.toLowerCase()) : "Ajouter : " + f.title.toLowerCase()}</h2><button class="x" data-act="close" aria-label="Fermer">×</button></div>
   <form class="f" data-kind="${kind}" data-id="${data?.id || ""}" data-parent="${extra?.parent || ""}">
     ${f.groups.map(([lg, fs]) => `<fieldset>${lg ? `<legend>${lg}</legend>` : ""}${fs.map(field).join("")}</fieldset>`).join("")}
     <p class="err" id="form-err" hidden></p>
@@ -599,7 +619,8 @@ document.addEventListener("click", async (e) => {
   else if (act === "new-holding") openForm("holding", null, { parent: id, crypto: find("accounts")?.type === "crypto" });
   else if (act === "edit-holding") openForm("holding", find("holdings"), { parent: find("holdings")?.accountId });
   else if (act === "new-property") openForm("property");
-  else if (act === "edit-property") openForm("property", find("properties"));
+  else if (act === "edit-property" && t.dataset.focus === "__loan") openForm("loan", null, { parent: id });
+  else if (act === "edit-property") { openForm("property", find("properties")); const f = t.dataset.focus && document.getElementById("f-property-" + t.dataset.focus); if (f) { f.scrollIntoView({ block: "center" }); f.focus(); } }
   else if (act === "new-loan") openForm("loan", null, { parent: id });
   else if (act === "edit-loan") openForm("loan", find("loans"), { parent: find("loans")?.propertyId });
   else if (act === "delete") {
