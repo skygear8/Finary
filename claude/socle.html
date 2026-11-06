@@ -1607,9 +1607,18 @@ function plansPanel(P) {
 }
 
 // 8. rapport du mois, à partager
-let reportText = "";
+let reportText = "", rProf = null;
+function withProfile(k, fn) { const p0 = profile; profile = k; applyProfile(k); try { return fn(); } finally { profile = p0; applyProfile(p0); } }
+// rapport par personne : comptes perso + sa part du compte joint ; Foyer : tout
 function sheetReport() {
-  const D = withScope("all", budgetData), m = bMonth, pm = shiftM(m, -1);
+  const rp = rProf || (["nathan", "angelique", "foyer"].includes(profile) ? profile : "nathan");
+  const seg = `<div class="seg" role="tablist" aria-label="Rapport de" style="margin-bottom:12px">${[["nathan", "Nathan"], ["angelique", "Angélique"], ["foyer", "Foyer"]].map(([k, l]) => `<button role="tab" class="seg-b" aria-selected="${rp === k}" data-rprof="${k}">${l}</button>`).join("")}</div>`;
+  return withProfile(rp, () => reportBody(rp, seg));
+}
+function reportBody(rp, seg) {
+  const split = (setOf("joint").nathan ?? 50) / 100, js = rp === "nathan" ? split : rp === "angelique" ? 1 - split : 1;
+  const D0 = withScope("all", budgetData), D = { ...D0, tx: D0.tx.filter((t) => js > 0 || t.accountId !== "joint").map((t) => t.accountId === "joint" && js !== 1 ? { ...t, amount: t.amount * js } : t) };
+  const m = bMonth, pm = shiftM(m, -1);
   const isCur = m === curMonth(), dd = new Date().getDate();
   const T = monthTotals(D.tx.filter((t) => ym(t.date) === m)), Pv = monthTotals(D.tx.filter((t) => ym(t.date) === pm && (!isCur || Number(t.date.slice(8, 10)) <= dd)));
   const rate = T.inc > 0 ? (T.rest / T.inc) * 100 : null;
@@ -1621,18 +1630,19 @@ function sheetReport() {
   const top = Object.keys(BCATS).filter((c) => BCATS[c][1] === "out" && T.by[c] < 0).map((c) => ({ c, v: -T.by[c], d: -T.by[c] + (Pv.by[c] || 0) })).sort((a, b) => b.v - a.v).slice(0, 3);
   const big = D.tx.filter((t) => ym(t.date) === m && t.amount < 0 && BCATS[t.c][1] === "out").sort((a, b) => a.amount - b.amount).slice(0, 3);
   const caps = capsOf("all"), over = Object.entries(caps).filter(([c, v]) => -(T.by[c] || 0) > v);
-  const who = PROFILES.find((p) => p.k === profile).label;
-  reportText = [`Socle · ${who} · ${monthName(m)}${isCur ? ` (au ${dd})` : ""}`, `Revenus ${fE(T.inc)} · Dépenses ${fE(T.out)} · Épargne nette ${fE(T.save)}${rate != null ? ` · Taux d'épargne ${fP(rate, 0)}` : ""}`,
+  const who = PROFILES.find((p) => p.k === rp).label;
+  reportText = [`Socle · ${who}${rp !== "foyer" ? ` (avec ${Math.round(js * 100)} % du compte joint)` : ""} · ${monthName(m)}${isCur ? ` (au ${dd})` : ""}`, `Revenus ${fE(T.inc)} · Dépenses ${fE(T.out)} · Épargne nette ${fE(T.save)}${rate != null ? ` · Taux d'épargne ${fP(rate, 0)}` : ""}`,
     dNet != null ? `Patrimoine net : ${sg(dNet)} sur le mois (${fE(netEnd)})` : "", top.length ? `Plus gros postes : ${top.map((x) => `${BCATS[x.c][0]} ${fE(x.v)} (${sg(x.d)})`).join(", ")}` : "",
     big.length ? `Plus grosses dépenses : ${big.map((t) => `${t.label} ${fE(-t.amount)}`).join(", ")}` : "", over.length ? `Plafonds dépassés : ${over.map(([c]) => BCATS[c][0]).join(", ")}` : ""].filter(Boolean).join("\n");
   return `<div class="sheet-head"><h2>Rapport · ${monthName(m)}${isCur ? `<small class="note" style="display:block;font-size:12px;font-weight:500">mois en cours, comparé à ${monthName(pm)} au même jour</small>` : ""}</h2><button class="x" data-act="close" aria-label="Fermer">×</button></div>
+    ${seg}
     <div class="grid2">${tile("Revenus", fE(T.inc), Pv.inc ? sg(T.inc - Pv.inc) + " vs " + monthName(pm, false) : "")}${tile("Dépenses", fE(T.out), Pv.out ? sg(T.out - Pv.out) + " vs " + monthName(pm, false) : "")}${tile("Épargne nette", fE(T.save), rate != null ? fP(rate, 0) + " des revenus" : "", T.save < 0 ? "loss" : "")}${tile("Patrimoine net", dNet != null ? sg(dNet) : "—", netEnd != null ? fE(netEnd) + (m === curMonth() ? " aujourd'hui" : " fin de mois") : "pas de photo ce mois-là", dNet != null ? tone(dNet) : "")}</div>
     ${top.length ? `<div class="panel kv" style="margin-top:12px"><div class="strong"><span>Plus gros postes</span><span></span></div>${top.map((x) => `<div><span>${BCATS[x.c][0]}</span><span>${fE(x.v)}<small class="${x.d > 0.5 ? "loss" : "gain"}"> ${sg(x.d)}</small></span></div>`).join("")}</div>` : ""}
     ${big.length ? `<div class="panel kv" style="margin-top:10px"><div class="strong"><span>Plus grosses dépenses</span><span></span></div>${big.map((t) => `<div><span>${esc(t.label)}<small class="note"> · ${new Date(t.date).toLocaleDateString("fr-FR", { day: "numeric", month: "short" })}</small></span><span>${fE2(-t.amount)}</span></div>`).join("")}</div>` : ""}
     ${over.length ? `<p class="note" style="margin-top:10px"><span class="pill overp">${over.length} plafond${over.length > 1 ? "s" : ""} dépassé${over.length > 1 ? "s" : ""}</span> ${over.map(([c]) => BCATS[c][0]).join(", ")}</p>` : ""}
     <div class="actions" style="margin-top:14px"><button class="btn" data-act="report-share">Partager le rapport</button></div>
     <textarea id="report-txt" class="report-txt" readonly hidden>${esc(reportText)}</textarea>
-    <p class="note">Tous les comptes courants du profil ${esc(who)}, compte joint compris.</p>`;
+    <p class="note">${rp === "foyer" ? "Tous les comptes courants des deux profils, compte joint compris en entier." : `Comptes courants de ${esc(who)}, plus sa part du compte joint (${Math.round(js * 100)} % des opérations, réglable dans Réglages). Patrimoine : profil ${esc(who)}.`}</p>`;
 }
 async function shareReport(btn) {
   try { if (navigator.share) { await navigator.share({ title: "Rapport Socle", text: reportText }); return; } } catch (e) { if (e?.name === "AbortError") return; }
@@ -1979,6 +1989,7 @@ document.addEventListener("click", async (e) => {
   const ca = e.target.closest("[data-calall]"); if (ca) { calDay = null; if (ca.dataset.calall === "now") bMonth = new Date().toISOString().slice(0, 7); openFolds.add("recur"); return render(); }
   const cd = e.target.closest("[data-calday]"); if (cd) { const d = Number(cd.dataset.calday); calDay = calDay === d ? null : d; openFolds.add("recur"); return render(); }
   const bs = e.target.closest("[data-bscope]"); if (bs) { bScope = bs.dataset.bscope; bCat = null; return render(); }
+  const rpb = e.target.closest("[data-rprof]"); if (rpb) { rProf = rpb.dataset.rprof; return openSheet({ html: sheetReport() }); }
   const js = e.target.closest("[data-jsplit]"); if (js) { openFolds.add("joint"); saveSet("joint", { nathan: Number(js.dataset.jsplit) }).catch(showErr); return; }
   const bc = e.target.closest("[data-bcat]"); if (bc) { bCat = bCat === bc.dataset.bcat ? null : bc.dataset.bcat; render(); document.querySelector(".txr, .dayh")?.closest("section")?.scrollIntoView({ behavior: "smooth", block: "start" }); return; }
   const ps = e.target.closest("[data-possort]"); if (ps) { posSort = ps.dataset.possort; return render(); }
@@ -1995,7 +2006,7 @@ document.addEventListener("click", async (e) => {
   if (act === "tx-import") { bImport = null; return openSheet({ html: sheetImport() }); }
   if (act === "tx-import-run") return runImport(t);
   if (act === "tx-caps") return openSheet({ html: sheetCaps(lastAvgs) });
-  if (act === "report") return openSheet({ html: sheetReport() });
+  if (act === "report") { rProf = null; return openSheet({ html: sheetReport() }); }
   if (act === "report-share") return shareReport(t);
   if (act === "budget-settings") return openSheet({ html: sheetBudgetSettings() });
   if (act === "alloc-edit") return openSheet({ html: sheetAlloc() });
