@@ -1,0 +1,615 @@
+<title>Socle</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&family=Figtree:wght@400;500;600&display=swap">
+<style>
+/* Layout : app mobile d'abord, en-tête de patrimoine net, onglets fixés en bas, fiches en feuille glissante. */
+:root {
+  --bg: #f3f6f5;
+  --surface: #ffffff;
+  --sunk: #e9efed;
+  --fg: #142321;
+  --muted: #5d6f6b;
+  --line: #dbe4e1;
+  --accent: #0e6e64;
+  --accent-ink: #ffffff;
+  --gain: #12805c;
+  --loss: #c2410c;
+  --c-liq: #7b8f8a;
+  --c-bourse: #0e6e64;
+  --c-av: #6d5bd0;
+  --c-crypto: #c98a12;
+  --c-immo: #2f6fd6;
+  --c-autre: #a3b1ad;
+  --font-display: "Sora", ui-sans-serif, system-ui, sans-serif;
+  --font-body: "Figtree", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --r: 14px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0c1312; --surface: #141d1c; --sunk: #1b2624; --fg: #e4ecea; --muted: #93a6a1; --line: #24312f;
+    --accent: #3cc4b2; --accent-ink: #062320; --gain: #4ade9b; --loss: #fb8b4b;
+    --c-liq: #8fa39e; --c-bourse: #3cc4b2; --c-av: #a395f2; --c-crypto: #e8b44a; --c-immo: #6fa1f2; --c-autre: #5d6f6b;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0c1312; --surface: #141d1c; --sunk: #1b2624; --fg: #e4ecea; --muted: #93a6a1; --line: #24312f;
+  --accent: #3cc4b2; --accent-ink: #062320; --gain: #4ade9b; --loss: #fb8b4b;
+  --c-liq: #8fa39e; --c-bourse: #3cc4b2; --c-av: #a395f2; --c-crypto: #e8b44a; --c-immo: #6fa1f2; --c-autre: #5d6f6b;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--fg); font-family: var(--font-body); font-size: 15px; line-height: 1.45;
+  font-variant-numeric: tabular-nums;
+}
+.wrap {
+  max-width: 760px; margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 18px calc(92px + env(safe-area-inset-bottom, 0px));
+}
+h1, h2, h3 { font-family: var(--font-display); text-wrap: balance; margin: 0; letter-spacing: -0.01em; }
+h2 { font-size: 15px; font-weight: 600; }
+.brand { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.brand b { font-family: var(--font-display); font-size: 17px; display: flex; align-items: center; gap: 8px; }
+.brand svg { width: 16px; height: 16px; }
+.status { font-size: 12px; color: var(--muted); }
+.hero { padding-block: 22px 18px; display: grid; gap: 4px; }
+.eyebrow { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); font-weight: 600; }
+.big { font-family: var(--font-display); font-size: clamp(34px, 9vw, 46px); font-weight: 700; letter-spacing: -0.03em; line-height: 1.05; }
+.sub { color: var(--muted); font-size: 13px; }
+.grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+@media (min-width: 640px) { .grid4 { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.tile { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 12px 14px; min-width: 0; }
+.tile .k { font-size: 12px; color: var(--muted); }
+.tile .v { font-family: var(--font-display); font-size: 19px; font-weight: 600; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tile .s { font-size: 12px; color: var(--muted); }
+.section { margin-top: 22px; display: grid; gap: 10px; }
+.section-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.section-head .total { font-weight: 600; }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 14px; min-width: 0; }
+.alloc { display: grid; grid-template-columns: 132px minmax(0, 1fr); gap: 16px; align-items: center; }
+@media (max-width: 520px) { .alloc { grid-template-columns: 1fr; justify-items: center; } }
+.legend { display: grid; gap: 8px; width: 100%; font-size: 14px; }
+.legend div { display: grid; grid-template-columns: 10px minmax(0, 1fr) auto auto; gap: 8px; align-items: center; }
+.legend div > span:nth-child(2) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dot { width: 10px; height: 10px; border-radius: 3px; }
+.pct { color: var(--muted); font-size: 12px; min-width: 42px; text-align: right; }
+.list { display: grid; }
+.row {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: center;
+  padding: 11px 2px; border-top: 1px solid var(--line); background: none; border-left: 0; border-right: 0; border-bottom: 0;
+  color: inherit; font: inherit; text-align: left; width: 100%; cursor: pointer;
+}
+.row:first-child { border-top: 0; }
+.row:hover .name { color: var(--accent); }
+.row .name { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.row .meta { font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.row .amt { text-align: right; font-weight: 600; white-space: nowrap; }
+.row .amt small { display: block; font-weight: 500; font-size: 12px; }
+.gain { color: var(--gain); } .loss { color: var(--loss); }
+.pill { display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 7px; border-radius: 99px; background: var(--sunk); color: var(--muted); }
+.btn {
+  appearance: none; border: 0; border-radius: 11px; padding: 11px 16px; font: 600 14px var(--font-body);
+  background: var(--accent); color: var(--accent-ink); cursor: pointer;
+}
+.btn.ghost { background: var(--sunk); color: var(--fg); }
+.btn.danger { background: transparent; color: var(--loss); border: 1px solid currentColor; }
+.btn:focus-visible, .row:focus-visible, .tab:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.add { width: 100%; }
+.empty { text-align: center; color: var(--muted); padding: 22px 8px; font-size: 14px; }
+.empty .btn { margin-top: 12px; }
+.note { font-size: 12px; color: var(--muted); }
+.bar { height: 6px; background: var(--sunk); border-radius: 99px; overflow: hidden; }
+.bar > i { display: block; height: 100%; background: var(--accent); border-radius: 99px; }
+.kv { display: grid; }
+.kv div { display: flex; justify-content: space-between; gap: 12px; padding: 6px 0; font-size: 14px; }
+.kv div span:first-child { color: var(--muted); }
+.kv .strong { border-top: 1px solid var(--line); margin-top: 4px; padding-top: 9px; font-weight: 600; }
+.kv .strong span:first-child { color: var(--fg); }
+svg text { fill: var(--muted); font-family: var(--font-body); font-size: 10px; }
+
+/* Onglets fixés en bas */
+.tabs {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 20;
+  background: color-mix(in srgb, var(--surface) 92%, transparent); backdrop-filter: blur(10px);
+  border-top: 1px solid var(--line);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  padding-left: max(8px, env(safe-area-inset-left, 0px)); padding-right: max(8px, env(safe-area-inset-right, 0px));
+}
+.tabs nav { max-width: 760px; margin: 0 auto; display: grid; grid-template-columns: repeat(3, 1fr); }
+.tab { appearance: none; background: none; border: 0; color: var(--muted); font: 500 12px var(--font-body); padding: 10px 4px 9px; display: grid; justify-items: center; gap: 3px; cursor: pointer; }
+.tab svg { width: 22px; height: 22px; }
+.tab[aria-current="page"] { color: var(--accent); }
+
+/* Feuille (formulaires et fiches) */
+.scrim { position: fixed; inset: 0; background: rgb(0 0 0 / 0.35); z-index: 30; }
+.sheet {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 31; max-height: 92%; overflow-y: auto;
+  background: var(--bg); border-radius: 20px 20px 0 0;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 10px calc(20px + env(safe-area-inset-bottom, 0px));
+}
+@media (min-width: 800px) { .sheet { left: 50%; width: 720px; transform: translateX(-50%); } }
+.grab { width: 38px; height: 5px; border-radius: 99px; background: var(--line); margin: 0 auto 12px; }
+.sheet-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 14px; }
+.sheet-head h2 { font-size: 19px; }
+.x { appearance: none; border: 0; background: var(--sunk); color: var(--fg); width: 32px; height: 32px; border-radius: 99px; font-size: 18px; cursor: pointer; flex: none; }
+form.f { display: grid; gap: 14px; }
+fieldset { border: 0; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+legend { grid-column: 1 / -1; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); padding: 0; margin-bottom: 8px; }
+label { display: grid; gap: 4px; font-size: 12px; color: var(--muted); min-width: 0; }
+label.full { grid-column: 1 / -1; }
+input, select {
+  width: 100%; font: 16px var(--font-body); color: var(--fg); background: var(--surface);
+  border: 1px solid var(--line); border-radius: 10px; padding: 10px 11px; min-width: 0;
+}
+.actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.actions .btn { flex: 1 1 140px; }
+.err { color: var(--loss); font-size: 13px; }
+.banner { background: var(--sunk); border-radius: 12px; padding: 10px 12px; font-size: 13px; color: var(--muted); margin-top: 12px; }
+@media (prefers-reduced-motion: no-preference) {
+  .sheet { animation: up 0.22s ease-out; }
+  @keyframes up { from { transform: translateY(24px); } }
+  @media (min-width: 800px) { @keyframes up { from { transform: translate(-50%, 24px); } } }
+}
+</style>
+
+<div class="wrap">
+  <header class="brand">
+    <b><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5 15 14.5H1z" fill="var(--accent)"/></svg>Socle</b>
+    <span class="status" id="status">Chargement…</span>
+  </header>
+  <main id="view"></main>
+</div>
+
+<div class="tabs">
+  <nav aria-label="Sections">
+    <button class="tab" data-tab="synthese"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 19V10M10 19V5M16 19v-7M21 19H3"/></svg>Synthèse</button>
+    <button class="tab" data-tab="comptes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="6" width="18" height="13" rx="2.5"/><path d="M3 10h18M7 15h4"/></svg>Comptes</button>
+    <button class="tab" data-tab="immobilier"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 11 12 4l9 7M5.5 9.5V20h13V9.5M10 20v-5h4v5"/></svg>Immobilier</button>
+  </nav>
+</div>
+
+<div id="sheet-root"></div>
+
+<script>
+/* ---------------- Référentiels ---------------- */
+const ACCOUNT_TYPES = { courant: "Compte courant", livret: "Livret / épargne", pea: "PEA", cto: "Compte-titres", assurance_vie: "Assurance-vie", per: "PER", crypto: "Crypto", autre: "Autre" };
+const ASSET_CLASSES = { action: "Action", etf: "ETF", fonds: "Fonds / OPCVM", obligation: "Obligation", crypto: "Crypto", fonds_euro: "Fonds euros", autre: "Autre" };
+const PROPERTY_TYPES = { residence_principale: "Résidence principale", locatif: "Locatif", secondaire: "Résidence secondaire", scpi: "SCPI" };
+const SLICES = [
+  { key: "liq", label: "Liquidités", types: ["courant", "livret"] },
+  { key: "bourse", label: "Bourse", types: ["pea", "cto"] },
+  { key: "av", label: "Assurance-vie / PER", types: ["assurance_vie", "per"] },
+  { key: "crypto", label: "Crypto", types: ["crypto"] },
+  { key: "immo", label: "Immobilier", types: [] },
+  { key: "autre", label: "Autre", types: ["autre"] },
+];
+
+/* ---------------- Format ---------------- */
+const eur0 = new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR", maximumFractionDigits: 0 });
+const eur2 = new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR", minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const fE = (v) => eur0.format(v || 0);
+const fE2 = (v) => eur2.format(v || 0);
+const fP = (v, d = 2) => (v < 0 ? "−" : "") + Math.abs(v || 0).toLocaleString("fr-FR", { minimumFractionDigits: d, maximumFractionDigits: d }) + " %";
+const tone = (v) => (v >= 0 ? "gain" : "loss");
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const num = (v) => { const n = Number(String(v ?? "").replace(/\s/g, "").replace(",", ".")); return Number.isFinite(n) ? n : 0; };
+
+/* ---------------- Calculs ---------------- */
+function monthlyPayment(P, ratePct, n) {
+  const r = ratePct / 100 / 12;
+  if (n <= 0) return 0;
+  return r === 0 ? P / n : (P * r) / (1 - Math.pow(1 + r, -n));
+}
+function paidMonths(start, at = new Date()) {
+  const s = new Date(start);
+  if (isNaN(s)) return 0;
+  const m = (at.getFullYear() - s.getFullYear()) * 12 + (at.getMonth() - s.getMonth());
+  return Math.max(0, m + (at.getDate() >= s.getDate() ? 0 : -1));
+}
+function amortization(l) {
+  const pmt = monthlyPayment(l.principal, l.rate, l.months), r = l.rate / 100 / 12, s = new Date(l.start);
+  let rem = l.principal; const rows = [];
+  for (let n = 1; n <= l.months; n++) {
+    const interest = rem * r, princ = Math.min(pmt - interest, rem);
+    rem = Math.max(0, rem - princ);
+    rows.push({ n, year: new Date(s.getFullYear(), s.getMonth() + n, 1).getFullYear(), interest, remaining: rem });
+  }
+  return rows;
+}
+function loanStatus(l) {
+  const rows = amortization(l), paid = Math.min(paidMonths(l.start), l.months);
+  const remaining = paid === 0 ? l.principal : rows[paid - 1].remaining;
+  const pmt = monthlyPayment(l.principal, l.rate, l.months);
+  const totalInterest = rows.reduce((a, r) => a + r.interest, 0);
+  const s = new Date(l.start), end = new Date(s.getFullYear(), s.getMonth() + l.months, 1);
+  return {
+    rows, paid, remaining, pmt, pmtAll: pmt + (l.insurance || 0), totalInterest,
+    interestPaid: rows.slice(0, paid).reduce((a, r) => a + r.interest, 0),
+    next12Interest: rows.slice(paid, paid + 12).reduce((a, r) => a + r.interest, 0),
+    totalCost: totalInterest + (l.insurance || 0) * l.months,
+    progress: l.principal ? (1 - remaining / l.principal) * 100 : 0,
+    end: end.toLocaleDateString("fr-FR", { month: "short", year: "numeric" }),
+  };
+}
+function propertyMetrics(p, loans) {
+  const share = (p.share ?? 100) / 100;
+  const cost = (p.price || 0) + (p.notary || 0) + (p.works || 0);
+  const rent = (p.rent || 0) * 12, effRent = rent * (1 - (p.vacancy || 0) / 100);
+  const mgmt = effRent * ((p.mgmt || 0) / 100);
+  const expenses = (p.charges || 0) * 12 + (p.tax || 0) + (p.pno || 0) + mgmt;
+  const net = effRent - expenses;
+  const st = loans.map(loanStatus);
+  const debt100 = st.reduce((a, s) => a + s.remaining, 0);
+  const monthlyLoan = st.reduce((a, s) => a + s.pmtAll, 0);
+  return {
+    cost, rent, effRent, mgmt, expenses, net, monthlyLoan,
+    next12Interest: st.reduce((a, s) => a + s.next12Interest, 0),
+    gross: cost ? (rent / cost) * 100 : 0, netYield: cost ? (net / cost) * 100 : 0,
+    cashflow: net / 12 - monthlyLoan,
+    value: (p.value || 0) * share, debt: debt100 * share, equity: ((p.value || 0) - debt100) * share,
+    gain: ((p.value || 0) - cost) * share, gainPct: cost ? (((p.value || 0) - cost) / cost) * 100 : 0,
+    sqm: p.surface ? (p.value || 0) / p.surface : null,
+  };
+}
+
+/* ---------------- État ---------------- */
+const S = { accounts: [], holdings: [], properties: [], loans: [], snapshots: [], ready: false, writable: true };
+const COLS = ["accounts", "holdings", "properties", "loans", "snapshots"];
+let db = null, tab = "synthese", sheet = null;
+
+function portfolio() {
+  const accRows = S.accounts.map((a) => {
+    const hs = S.holdings.filter((h) => h.accountId === a.id);
+    return { ...a, hs, value: (a.cash || 0) + hs.reduce((s, h) => s + h.qty * h.price, 0) };
+  });
+  const propRows = S.properties.map((p) => ({ ...p, loans: S.loans.filter((l) => l.propertyId === p.id), m: propertyMetrics(p, S.loans.filter((l) => l.propertyId === p.id)) }));
+  const otherLoans = S.loans.filter((l) => !l.propertyId || !S.properties.some((p) => p.id === l.propertyId)).map((l) => ({ ...l, s: loanStatus(l) }));
+  const alloc = SLICES.map((sl) => ({
+    ...sl,
+    value: sl.key === "immo" ? propRows.reduce((s, p) => s + p.m.value, 0) : accRows.filter((a) => sl.types.includes(a.type)).reduce((s, a) => s + a.value, 0),
+  })).filter((s) => s.value > 0);
+  const assets = alloc.reduce((s, x) => s + x.value, 0);
+  const debts = propRows.reduce((s, p) => s + p.m.debt, 0) + otherLoans.reduce((s, l) => s + l.s.remaining, 0);
+  return { accRows, propRows, otherLoans, alloc, assets, debts, net: assets - debts };
+}
+
+/* ---------------- Graphiques SVG ---------------- */
+function donut(alloc) {
+  const total = alloc.reduce((s, a) => s + a.value, 0) || 1, R = 54, C = 2 * Math.PI * R;
+  let off = 0;
+  const arcs = alloc.map((a) => {
+    const len = (a.value / total) * C, gap = alloc.length > 1 ? 2 : 0;
+    const el = `<circle r="${R}" cx="66" cy="66" fill="none" stroke="var(--c-${a.key})" stroke-width="20" stroke-dasharray="${Math.max(0, len - gap)} ${C}" stroke-dashoffset="${-off}" transform="rotate(-90 66 66)"/>`;
+    off += len; return el;
+  }).join("");
+  return `<svg viewBox="0 0 132 132" width="132" height="132" role="img" aria-label="Répartition du patrimoine">${arcs}</svg>`;
+}
+function lineChart(points, label) {
+  if (points.length < 2) return `<p class="note">La courbe se construit toute seule : une photo de ton patrimoine net est enregistrée chaque jour où tu ouvres Socle.</p>`;
+  const W = 320, H = 130, pl = 44, pr = 8, pt = 10, pb = 20;
+  const ys = points.map((p) => p.y), min = Math.min(...ys), max = Math.max(...ys);
+  const step = niceStep((max - min) / 3 || Math.abs(max) / 4 || 1000);
+  const lo = Math.floor(min / step) * step, hi = Math.max(lo + step, Math.ceil(max / step) * step);
+  const t0 = points[0].x, t1 = points[points.length - 1].x || t0 + 1;
+  const X = (x) => pl + ((x - t0) / (t1 - t0 || 1)) * (W - pl - pr), Y = (y) => pt + (1 - (y - lo) / (hi - lo)) * (H - pt - pb);
+  let grid = "";
+  for (let v = lo; v <= hi + 1e-6; v += step) grid += `<line x1="${pl}" x2="${W - pr}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--line)"/><text x="${pl - 6}" y="${Y(v) + 3}" text-anchor="end">${Math.round(v / 1000)} k€</text>`;
+  const d = points.map((p, i) => `${i ? "L" : "M"}${X(p.x).toFixed(1)},${Y(p.y).toFixed(1)}`).join("");
+  const area = `${d}L${X(t1)},${H - pb}L${X(t0)},${H - pb}Z`;
+  const fmt = (t) => new Date(t).toLocaleDateString("fr-FR", { month: "short", year: "2-digit" });
+  const last = points[points.length - 1];
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="${esc(label)}">
+    ${grid}<path d="${area}" fill="var(--accent)" opacity="0.12"/><path d="${d}" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round"/>
+    <circle cx="${X(last.x)}" cy="${Y(last.y)}" r="3.5" fill="var(--accent)"/>
+    <text x="${pl}" y="${H - 4}">${fmt(t0)}</text><text x="${W - pr}" y="${H - 4}" text-anchor="end">${fmt(t1)}</text></svg>`;
+}
+function niceStep(raw) { const p = Math.pow(10, Math.floor(Math.log10(Math.abs(raw) || 1))); const n = raw / p; return (n <= 1 ? 1 : n <= 2 ? 2 : n <= 5 ? 5 : 10) * p; }
+
+/* ---------------- Vues ---------------- */
+const tile = (k, v, s = "", cls = "") => `<div class="tile"><div class="k">${k}</div><div class="v ${cls}">${v}</div>${s ? `<div class="s">${s}</div>` : ""}</div>`;
+
+function viewSynthese(P) {
+  if (!S.accounts.length && !S.properties.length) return `
+    <section class="hero"><div class="eyebrow">Patrimoine net</div><div class="big">${fE(0)}</div></section>
+    <div class="panel empty">Ajoute ton premier compte ou ton premier bien pour voir ton patrimoine.<br>
+      <button class="btn" data-act="new-account">Ajouter un compte</button> <button class="btn ghost" data-act="new-property">Ajouter un bien</button></div>`;
+  const rental = P.propRows.filter((p) => p.type !== "residence_principale");
+  const cf = rental.reduce((s, p) => s + p.m.cashflow, 0);
+  const hist = S.snapshots.map((s) => ({ x: new Date(s.id).getTime(), y: s.assets - s.debts })).sort((a, b) => a.x - b.x);
+  const first = hist[0], delta = first ? P.net - first.y : 0;
+  return `
+  <section class="hero">
+    <div class="eyebrow">Patrimoine net</div>
+    <div class="big">${fE(P.net)}</div>
+    ${first && hist.length > 1 ? `<div class="sub"><span class="${tone(delta)}">${delta >= 0 ? "+" : "−"}${fE(Math.abs(delta))}</span> depuis le ${new Date(first.x).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })}</div>` : ""}
+  </section>
+  <div class="grid2 grid4">
+    ${tile("Patrimoine brut", fE(P.assets))}
+    ${tile("Dettes", fE(P.debts), P.assets ? "Endettement " + fP((P.debts / P.assets) * 100, 1) : "")}
+    ${tile("Cash-flow locatif", fE(cf) + "<small style='font-size:12px;font-weight:500'> /mois</small>", rental.length ? "Loyers " + fE(rental.reduce((s, p) => s + p.m.rent, 0)) + " / an" : "Aucun bien locatif", rental.length ? tone(cf) : "")}
+    ${tile("Plus-values latentes", fE(P.accRows.reduce((s, a) => s + a.hs.reduce((t, h) => t + h.qty * (h.price - h.pru), 0), 0)), "Bourse et crypto", tone(P.accRows.reduce((s, a) => s + a.hs.reduce((t, h) => t + h.qty * (h.price - h.pru), 0), 0)))}
+  </div>
+  <section class="section">
+    <h2>Répartition</h2>
+    <div class="panel alloc">${donut(P.alloc)}<div class="legend">${P.alloc.map((a) => `<div><span class="dot" style="background:var(--c-${a.key})"></span><span>${a.label}</span><span class="pct">${fP((a.value / P.assets) * 100, 1)}</span><b>${fE(a.value)}</b></div>`).join("")}</div></div>
+  </section>
+  <section class="section">
+    <h2>Évolution du patrimoine net</h2>
+    <div class="panel">${lineChart(hist, "Évolution du patrimoine net")}</div>
+  </section>`;
+}
+
+function viewComptes(P) {
+  const groups = Object.entries(ACCOUNT_TYPES).map(([k, label]) => ({ k, label, rows: P.accRows.filter((a) => a.type === k).sort((a, b) => b.value - a.value) })).filter((g) => g.rows.length);
+  const total = P.accRows.reduce((s, a) => s + a.value, 0);
+  return `
+  <section class="hero"><div class="eyebrow">Comptes et placements</div><div class="big">${fE(total)}</div></section>
+  ${groups.map((g) => `
+    <section class="section">
+      <div class="section-head"><h2>${g.label}</h2><span class="total">${fE(g.rows.reduce((s, a) => s + a.value, 0))}</span></div>
+      <div class="panel list">${g.rows.map((a) => {
+        const pnl = a.hs.reduce((s, h) => s + h.qty * (h.price - h.pru), 0);
+        return `<button class="row" data-act="open-account" data-id="${a.id}">
+          <span><div class="name">${esc(a.name)}</div><div class="meta">${esc(a.institution || "")}${a.hs.length ? `${a.institution ? " · " : ""}${a.hs.length} ligne${a.hs.length > 1 ? "s" : ""}` : ""}</div></span>
+          <span class="amt">${fE(a.value)}${a.hs.length ? `<small class="${tone(pnl)}">${pnl >= 0 ? "+" : "−"}${fE(Math.abs(pnl))}</small>` : ""}</span></button>`;
+      }).join("")}</div>
+    </section>`).join("")}
+  ${groups.length ? "" : `<div class="panel empty">Aucun compte pour l'instant.</div>`}
+  <div class="section"><button class="btn add" data-act="new-account">Ajouter un compte</button></div>`;
+}
+
+function viewImmo(P) {
+  const R = P.propRows, v = R.reduce((s, p) => s + p.m.value, 0), d = R.reduce((s, p) => s + p.m.debt, 0);
+  const cf = R.filter((p) => p.type !== "residence_principale").reduce((s, p) => s + p.m.cashflow, 0);
+  return `
+  <section class="hero"><div class="eyebrow">Immobilier, net de crédit</div><div class="big">${fE(v - d)}</div>
+    <div class="sub">Valeur ${fE(v)} · restant dû ${fE(d)}</div></section>
+  ${R.length ? `<div class="grid2">${tile("Cash-flow locatif", fE(cf) + "<small style='font-size:12px;font-weight:500'> /mois</small>", "après crédit et charges", tone(cf))}${tile("Loyers bruts", fE(R.reduce((s, p) => s + p.m.rent, 0)), "par an")}</div>` : ""}
+  <section class="section">
+    <div class="panel list">${R.map((p) => `<button class="row" data-act="open-property" data-id="${p.id}">
+      <span><div class="name">${esc(p.name)}</div><div class="meta">${PROPERTY_TYPES[p.type] || ""}${p.city ? " · " + esc(p.city) : ""}${(p.share ?? 100) < 100 ? " · " + p.share + " %" : ""}</div></span>
+      <span class="amt">${fE(p.m.value)}${p.m.rent ? `<small class="${tone(p.m.netYield)}">${fP(p.m.netYield)} net</small>` : `<small class="note">${fE(p.m.debt)} dû</small>`}</span></button>`).join("") || `<div class="empty">Aucun bien pour l'instant.</div>`}</div>
+  </section>
+  <div class="section"><button class="btn add" data-act="new-property">Ajouter un bien</button></div>`;
+}
+
+/* ---------------- Fiches ---------------- */
+function sheetAccount(a) {
+  const pnl = a.hs.reduce((s, h) => s + h.qty * (h.price - h.pru), 0), inv = a.hs.reduce((s, h) => s + h.qty * h.pru, 0);
+  const invest = !["courant", "livret"].includes(a.type);
+  return `
+  <div class="sheet-head"><div><h2>${esc(a.name)}</h2><div class="note">${ACCOUNT_TYPES[a.type]}${a.institution ? " · " + esc(a.institution) : ""}</div></div><button class="x" data-act="close" aria-label="Fermer">×</button></div>
+  <div class="grid2">${tile("Valeur", fE(a.value))}${tile("Liquidités", fE(a.cash))}${invest && a.hs.length ? tile("Investi (PRU)", fE(inv)) + tile("Plus-value latente", fE(pnl), inv ? fP((pnl / inv) * 100) : "", tone(pnl)) : ""}</div>
+  ${invest ? `<section class="section"><div class="section-head"><h2>Positions</h2><button class="btn ghost" data-act="new-holding" data-id="${a.id}">Ajouter</button></div>
+    <div class="panel list">${a.hs.map((h) => {
+      const v = h.qty * h.price, g = h.qty * (h.price - h.pru), gp = h.pru ? ((h.price - h.pru) / h.pru) * 100 : 0;
+      return `<button class="row" data-act="edit-holding" data-id="${h.id}"><span><div class="name">${esc(h.name)}</div>
+        <div class="meta">${h.qty.toLocaleString("fr-FR", { maximumFractionDigits: 6 })} × ${fE2(h.price)} · PRU ${fE2(h.pru)}</div></span>
+        <span class="amt">${fE(v)}<small class="${tone(g)}">${g >= 0 ? "+" : "−"}${fE(Math.abs(g))} · ${fP(gp, 1)}</small></span></button>`;
+    }).join("") || `<div class="empty">Aucune position.</div>`}</div></section>` : ""}
+  <div class="section actions"><button class="btn ghost" data-act="edit-account" data-id="${a.id}">Modifier le compte</button></div>`;
+}
+
+function sheetProperty(p) {
+  const m = p.m;
+  return `
+  <div class="sheet-head"><div><h2>${esc(p.name)}</h2><div class="note">${PROPERTY_TYPES[p.type] || ""}${p.city ? " · " + esc(p.city) : ""}${p.surface ? " · " + p.surface + " m² · " + fE(m.sqm) + "/m²" : ""}</div></div><button class="x" data-act="close" aria-label="Fermer">×</button></div>
+  <div class="grid2">
+    ${tile("Valeur estimée", fE(m.value), (p.share ?? 100) < 100 ? `quote-part ${p.share} % de ${fE(p.value)}` : "")}
+    ${tile("Net de crédit", fE(m.equity))}
+    ${tile("Plus-value latente", fE(m.gain), fP(m.gainPct, 1) + " vs coût total", tone(m.gain))}
+    ${tile("Cash-flow", fE(m.cashflow) + "<small style='font-size:12px;font-weight:500'> /mois</small>", "après crédit et charges", tone(m.cashflow))}
+  </div>
+  <section class="section"><h2>Coût d'acquisition</h2><div class="panel kv">
+    <div><span>Prix d'achat</span><span>${fE(p.price)}</span></div>
+    <div><span>Frais de notaire</span><span>${fE(p.notary)}</span></div>
+    <div><span>Travaux</span><span>${fE(p.works)}</span></div>
+    <div class="strong"><span>Coût total</span><span>${fE(m.cost)}</span></div>
+    ${p.bought ? `<div><span>Acheté le</span><span>${new Date(p.bought).toLocaleDateString("fr-FR")}</span></div>` : ""}
+  </div></section>
+  ${m.rent ? `<section class="section"><h2>Rentabilité sur un an</h2><div class="panel kv">
+    <div><span>Loyers hors charges</span><span>${fE(m.rent)}</span></div>
+    <div><span>Vacance (${p.vacancy || 0} %)</span><span>− ${fE(m.rent - m.effRent)}</span></div>
+    <div><span>Charges de copro non récupérables</span><span>− ${fE((p.charges || 0) * 12)}</span></div>
+    <div><span>Taxe foncière</span><span>− ${fE(p.tax)}</span></div>
+    <div><span>Assurance PNO</span><span>− ${fE(p.pno)}</span></div>
+    <div><span>Gestion (${p.mgmt || 0} %)</span><span>− ${fE(m.mgmt)}</span></div>
+    <div class="strong"><span>Revenu net de charges</span><span>${fE(m.net)}</span></div>
+    <div><span>Rendement brut</span><span>${fP(m.gross)}</span></div>
+    <div><span>Rendement net de charges</span><span>${fP(m.netYield)}</span></div>
+    <div><span>Mensualités de crédit, assurance comprise</span><span>− ${fE(m.monthlyLoan * 12)}</span></div>
+    <div><span>Intérêts des 12 prochains mois</span><span>${fE(m.next12Interest)}</span></div>
+    <div class="strong"><span>Cash-flow annuel</span><span class="${tone(m.cashflow)}">${fE(m.cashflow * 12)}</span></div>
+  </div></section>` : ""}
+  <section class="section"><div class="section-head"><h2>Crédits</h2><button class="btn ghost" data-act="new-loan" data-id="${p.id}">Ajouter</button></div>
+    ${p.loans.map((l) => {
+      const s = loanStatus(l);
+      const yearly = []; s.rows.forEach((r) => { if (r.n % 12 === 0 || r.n === l.months) yearly.push({ x: new Date(r.year, 0, 1).getTime(), y: r.remaining }); });
+      yearly.unshift({ x: new Date(l.start).getTime(), y: l.principal });
+      return `<div class="panel" style="display:grid;gap:12px">
+        <div class="section-head"><b>${esc(l.name)}</b><button class="btn ghost" data-act="edit-loan" data-id="${l.id}">Modifier</button></div>
+        <div class="grid2">${tile("Restant dû (100 %)", fE(s.remaining), "sur " + fE(l.principal))}${tile("Mensualité", fE2(s.pmtAll), "dont assurance " + fE2(l.insurance))}${tile("Taux, durée", fP(l.rate), l.months / 12 + " ans · fin " + s.end)}${tile("Coût total", fE(s.totalCost), "intérêts payés " + fE(s.interestPaid))}</div>
+        <div><div class="section-head note"><span>${s.paid} échéances payées</span><span>${l.months - s.paid} restantes</span></div><div class="bar"><i style="width:${s.progress.toFixed(1)}%"></i></div></div>
+        ${lineChart(yearly, "Capital restant dû")}
+      </div>`;
+    }).join("") || `<div class="panel empty">Aucun crédit sur ce bien.</div>`}
+  </section>
+  <div class="section actions"><button class="btn ghost" data-act="edit-property" data-id="${p.id}">Modifier le bien</button></div>`;
+}
+
+/* ---------------- Formulaires ---------------- */
+const F = {
+  account: { title: "Compte", col: "accounts", groups: [[null, [
+    ["name", "Nom", "text", { full: 1, req: 1, ph: "PEA, Livret A…" }], ["type", "Type", ACCOUNT_TYPES], ["institution", "Établissement", "text"],
+    ["cash", "Liquidités ou solde (€)", "number", { full: 1 }]]]] },
+  holding: { title: "Position", col: "holdings", groups: [[null, [
+    ["name", "Nom", "text", { full: 1, req: 1, ph: "ETF MSCI World" }], ["ticker", "Ticker ou ISIN", "text"], ["cls", "Classe", ASSET_CLASSES],
+    ["qty", "Quantité", "number", { req: 1 }], ["pru", "PRU (€)", "number", { req: 1 }], ["price", "Cours actuel (€)", "number", { full: 1 }]]]] },
+  property: { title: "Bien immobilier", col: "properties", groups: [
+    ["Le bien", [["name", "Nom", "text", { full: 1, req: 1, ph: "T2 Lyon 7e" }], ["type", "Usage", PROPERTY_TYPES], ["city", "Ville", "text"], ["surface", "Surface (m²)", "number"], ["share", "Quote-part détenue (%)", "number", { def: 100 }], ["bought", "Date d'achat", "date", { full: 1 }]]],
+    ["Acquisition et valeur", [["price", "Prix d'achat (€)", "number", { req: 1 }], ["notary", "Frais de notaire (€)", "number"], ["works", "Travaux (€)", "number"], ["value", "Valeur estimée (€)", "number"]]],
+    ["Loyers et charges", [["rent", "Loyer mensuel HC (€)", "number"], ["charges", "Copro non récup. / mois (€)", "number"], ["tax", "Taxe foncière / an (€)", "number"], ["pno", "Assurance PNO / an (€)", "number"], ["mgmt", "Gestion (% des loyers)", "number"], ["vacancy", "Vacance locative (%)", "number"]]]] },
+  loan: { title: "Crédit", col: "loans", groups: [[null, [
+    ["name", "Nom", "text", { full: 1, def: "Prêt immobilier" }], ["principal", "Montant emprunté (€)", "number", { req: 1 }], ["rate", "Taux nominal (%)", "number", { req: 1 }],
+    ["years", "Durée (années)", "number", { def: 20, req: 1 }], ["start", "Date de déblocage", "date", { req: 1 }], ["insurance", "Assurance / mois (€)", "number", { full: 1 }]]]] },
+};
+
+function formHtml(kind, data, extra) {
+  const f = F[kind], d = data || {};
+  if (kind === "loan" && d.months) d.years = d.months / 12;
+  const field = ([k, label, type, o = {}]) => {
+    const val = d[k] ?? o.def ?? (type === "number" ? "" : "");
+    const id = `f-${kind}-${k}`;
+    const input = typeof type === "object"
+      ? `<select id="${id}" name="${k}">${Object.entries(type).map(([v, l]) => `<option value="${v}" ${v === (d[k] ?? (kind === "holding" && k === "cls" && extra?.crypto ? "crypto" : "")) ? "selected" : ""}>${l}</option>`).join("")}</select>`
+      : `<input id="${id}" name="${k}" type="${type === "number" ? "text" : type}" ${type === "number" ? 'inputmode="decimal"' : ""} value="${esc(val)}" ${o.req ? "required" : ""} placeholder="${esc(o.ph || "")}">`;
+    return `<label class="${o.full ? "full" : ""}" for="${id}">${label}${input}</label>`;
+  };
+  return `
+  <div class="sheet-head"><h2>${data ? "Modifier" : "Ajouter"} : ${f.title.toLowerCase()}</h2><button class="x" data-act="close" aria-label="Fermer">×</button></div>
+  <form class="f" data-kind="${kind}" data-id="${data?.id || ""}" data-parent="${extra?.parent || ""}">
+    ${f.groups.map(([lg, fs]) => `<fieldset>${lg ? `<legend>${lg}</legend>` : ""}${fs.map(field).join("")}</fieldset>`).join("")}
+    <p class="err" id="form-err" hidden></p>
+    <div class="actions"><button class="btn" type="submit">Enregistrer</button>
+      ${data ? `<button class="btn danger" type="button" data-act="delete" data-kind="${kind}" data-id="${data.id}">Supprimer</button>` : ""}</div>
+  </form>`;
+}
+
+function readForm(form) {
+  const kind = form.dataset.kind, fd = new FormData(form), o = {};
+  for (const [, fs] of F[kind].groups) for (const [k, , type] of fs) {
+    const v = fd.get(k);
+    o[k] = type === "number" ? num(v) : String(v ?? "").trim();
+  }
+  if (kind === "property") { if (!o.value) o.value = o.price; if (!fd.get("share")) o.share = 100; }
+  if (kind === "holding" && !o.price) o.price = o.pru;
+  if (kind === "loan") { o.months = Math.round(o.years * 12); delete o.years; }
+  return o;
+}
+
+/* ---------------- Sauvegarde ---------------- */
+async function save(col, id, data) {
+  if (!db) throw new Error("La sauvegarde n'est pas disponible dans cette vue.");
+  if (id) await db.collection(col).doc(id).set(data);
+  else await db.collection(col).add({ ...data, createdAt: new Date().toISOString() });
+}
+async function remove(kind, id) {
+  const col = F[kind].col;
+  await db.collection(col).doc(id).delete();
+  if (kind === "account") for (const h of S.holdings.filter((h) => h.accountId === id)) await db.collection("holdings").doc(h.id).delete();
+  if (kind === "property") for (const l of S.loans.filter((l) => l.propertyId === id)) await db.collection("loans").doc(l.id).delete();
+}
+let snapDone = false;
+async function snapshotToday() {
+  if (snapDone || !db || !S.ready || !S.writable) return;
+  const P = portfolio(); if (!P.assets && !P.debts) return;
+  const id = new Date().toISOString().slice(0, 10), cur = S.snapshots.find((s) => s.id === id);
+  snapDone = true;
+  if (cur && Math.round(cur.assets) === Math.round(P.assets) && Math.round(cur.debts) === Math.round(P.debts)) return;
+  try { await db.collection("snapshots").doc(id).set({ assets: Math.round(P.assets), debts: Math.round(P.debts) }); } catch { /* lecture seule */ }
+}
+
+/* ---------------- Rendu ---------------- */
+const $ = (s) => document.querySelector(s);
+function render() {
+  const P = portfolio();
+  $("#view").innerHTML = tab === "comptes" ? viewComptes(P) : tab === "immobilier" ? viewImmo(P) : viewSynthese(P);
+  document.querySelectorAll(".tab").forEach((t) => t.setAttribute("aria-current", t.dataset.tab === tab ? "page" : "false"));
+  if (sheet && sheet.live) openSheet(sheet, true);
+}
+function openSheet(s, refresh) {
+  sheet = s;
+  const P = portfolio();
+  let html = "";
+  if (s.type === "account") { const a = P.accRows.find((x) => x.id === s.id); if (!a) return closeSheet(); html = sheetAccount(a); }
+  else if (s.type === "property") { const p = P.propRows.find((x) => x.id === s.id); if (!p) return closeSheet(); html = sheetProperty(p); }
+  else html = s.html;
+  const root = $("#sheet-root"), scroll = root.querySelector(".sheet")?.scrollTop || 0;
+  root.innerHTML = `<div class="scrim" data-act="close"></div><div class="sheet" role="dialog" aria-modal="true"><div class="grab"></div>${html}</div>`;
+  if (refresh) root.querySelector(".sheet").scrollTop = scroll;
+}
+function closeSheet() { sheet = null; $("#sheet-root").innerHTML = ""; }
+function openForm(kind, data, extra) {
+  const back = sheet && sheet.live ? { ...sheet } : null;
+  openSheet({ html: formHtml(kind, data, extra), back });
+}
+function goBack() { const b = sheet?.back; if (b) openSheet(b); else closeSheet(); }
+
+function setTab(t) {
+  tab = ["synthese", "comptes", "immobilier"].includes(t) ? t : "synthese";
+  if (location.hash.slice(1) !== tab) { try { history.replaceState(null, "", "#" + tab); } catch {} }
+  render(); window.scrollTo(0, 0);
+}
+
+document.addEventListener("click", async (e) => {
+  const t = e.target.closest("[data-tab],[data-act]"); if (!t) return;
+  if (t.dataset.tab) return setTab(t.dataset.tab);
+  const id = t.dataset.id, act = t.dataset.act;
+  const find = (col) => S[col].find((x) => x.id === id);
+  if (act === "close") return sheet?.back ? goBack() : closeSheet();
+  if (!S.writable && /^(new|edit)-/.test(act)) return;
+  if (act === "open-account") openSheet({ type: "account", id, live: true });
+  else if (act === "open-property") openSheet({ type: "property", id, live: true });
+  else if (act === "new-account") openForm("account");
+  else if (act === "edit-account") openForm("account", find("accounts"));
+  else if (act === "new-holding") openForm("holding", null, { parent: id, crypto: find("accounts")?.type === "crypto" });
+  else if (act === "edit-holding") openForm("holding", find("holdings"), { parent: find("holdings")?.accountId });
+  else if (act === "new-property") openForm("property");
+  else if (act === "edit-property") openForm("property", find("properties"));
+  else if (act === "new-loan") openForm("loan", null, { parent: id });
+  else if (act === "edit-loan") openForm("loan", find("loans"), { parent: find("loans")?.propertyId });
+  else if (act === "delete") {
+    if (t.dataset.confirm !== "1") { t.dataset.confirm = "1"; t.textContent = "Confirmer la suppression"; return; }
+    t.disabled = true;
+    try { await remove(t.dataset.kind, id); goBack(); }
+    catch (err) { showErr(err); t.disabled = false; }
+  }
+});
+document.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const form = e.target, kind = form.dataset.kind, id = form.dataset.id || null, parent = form.dataset.parent || null;
+  const data = readForm(form);
+  if (kind === "holding") data.accountId = parent;
+  if (kind === "loan") data.propertyId = parent;
+  const old = id ? S[F[kind].col].find((x) => x.id === id) : null;
+  if (old?.createdAt) data.createdAt = old.createdAt;
+  const btn = form.querySelector("[type=submit]"); btn.disabled = true; btn.textContent = "Enregistrement…";
+  try {
+    await save(F[kind].col, id, data);
+    const back = sheet?.back;
+    if (back) openSheet(back); else closeSheet();
+  } catch (err) { showErr(err); btn.disabled = false; btn.textContent = "Enregistrer"; }
+});
+function showErr(err) {
+  const el = document.getElementById("form-err"); if (!el) return;
+  el.hidden = false;
+  el.textContent = err?.code === "quota_exceeded" ? "L'espace de sauvegarde est plein : supprime d'anciennes lignes puis réessaie." :
+    err?.code === "invalid_argument" ? "Tu peux consulter ce Socle mais pas le modifier." : "Enregistrement impossible pour le moment. Réessaie dans un instant.";
+}
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && sheet) closeSheet(); });
+window.addEventListener("hashchange", () => setTab(location.hash.slice(1)));
+
+/* ---------------- Démarrage ---------------- */
+setTab(location.hash.slice(1));
+(async () => {
+  const status = $("#status");
+  const timer = setTimeout(() => { if (!S.ready) status.textContent = "Données injoignables pour l'instant"; }, 10000);
+  try { db = await window.claude?.use?.("db"); } catch { db = null; }
+  if (!db) { clearTimeout(timer); status.textContent = "Ouvre Socle dans Claude pour voir tes données"; return; }
+  try { const u = await window.claude.use("user"); if (u && (await u.can?.("data.write")) === false) S.writable = false; } catch {}
+  const got = new Set();
+  for (const col of COLS) {
+    db.collection(col).onSnapshot((snap) => {
+      S[col] = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      if (!snap.metadata.fromCache) got.add(col);
+      if (got.size === COLS.length && !S.ready) { S.ready = true; clearTimeout(timer); status.textContent = S.writable ? "Enregistré dans Claude" : "Lecture seule"; snapshotToday(); }
+      render();
+    }, () => { clearTimeout(timer); status.textContent = "Données indisponibles"; });
+  }
+})();
+</script>
