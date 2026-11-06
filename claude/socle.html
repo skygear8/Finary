@@ -266,13 +266,18 @@ function propertyMetrics(p, loans) {
   const st = loans.map(loanStatus);
   const debt100 = st.reduce((a, s) => a + s.remaining, 0);
   const monthlyLoan = st.reduce((a, s) => a + s.pmtAll, 0);
+  // apport personnel via une société (capital + compte courant d'associé) : compté une fois l'acte passé
+  const apport = (p.capital || 0) + (p.cca || 0), apportLive = apport > 0 && p.bought && new Date(p.bought) <= new Date() ? apport : 0;
+  const equity = ((p.value || 0) - debt100) * share;
   return {
+    apport, apportLive,
     cost, rent, effRent, mgmt, expenses, net, monthlyLoan,
     next12Interest: st.reduce((a, s) => a + s.next12Interest, 0),
     gross: cost ? (rent / cost) * 100 : 0, netYield: cost ? (net / cost) * 100 : 0,
     cashflow: net / 12 - monthlyLoan, myCashflow: (net / 12 - monthlyLoan) * share,
-    value: (p.value || 0) * share, debt: debt100 * share, equity: ((p.value || 0) - debt100) * share,
-    gain: ((p.value || 0) - cost) * share, gainPct: cost ? (((p.value || 0) - cost) / cost) * 100 : 0,
+    value: (p.value || 0) * share, debt: debt100 * share, equity: equity + apportLive,
+    gain: apport ? equity : ((p.value || 0) - cost) * share,
+    gainPct: apport ? (equity / apport) * 100 : cost ? (((p.value || 0) - cost) / cost) * 100 : 0,
     sqm: p.surface ? (p.value || 0) / p.surface : null,
   };
 }
@@ -291,7 +296,7 @@ function portfolio() {
   const otherLoans = S.loans.filter((l) => !l.propertyId || !S.properties.some((p) => p.id === l.propertyId)).map((l) => ({ ...l, s: loanStatus(l) }));
   const alloc = SLICES.map((sl) => ({
     ...sl,
-    value: sl.key === "immo" ? propRows.reduce((s, p) => s + p.m.value, 0) : accRows.filter((a) => sl.types.includes(a.type)).reduce((s, a) => s + a.value, 0),
+    value: sl.key === "immo" ? propRows.reduce((s, p) => s + p.m.value + p.m.apportLive, 0) : accRows.filter((a) => sl.types.includes(a.type)).reduce((s, a) => s + a.value, 0),
   })).filter((s) => s.value > 0);
   const assets = alloc.reduce((s, x) => s + x.value, 0);
   const debts = propRows.reduce((s, p) => s + p.m.debt, 0) + otherLoans.reduce((s, l) => s + l.s.remaining, 0);
@@ -469,7 +474,7 @@ function viewPositions(P) {
 }
 
 function viewImmo(P) {
-  const R = P.propRows, v = R.reduce((s, p) => s + p.m.value, 0), d = R.reduce((s, p) => s + p.m.debt, 0);
+  const R = P.propRows, v = R.reduce((s, p) => s + p.m.value + p.m.apportLive, 0), d = R.reduce((s, p) => s + p.m.debt, 0);
   const cf = R.filter((p) => p.type !== "residence_principale").reduce((s, p) => s + p.m.myCashflow, 0);
   return `
   <section class="hero"><div class="eyebrow">Immobilier, net de crédit</div><div class="big">${fE(v - d)}</div>
@@ -520,8 +525,8 @@ function sheetProperty(p) {
   ${missingProperty(p).length ? `<div class="todo"><b>À compléter pour des calculs justes</b><div class="chips">${missingProperty(p).map((x) => `<button class="chip" data-act="edit-property" data-id="${p.id}" data-focus="${x[0]}">${x[1]}</button>`).join("")}</div></div>` : ""}
   <div class="grid2">
     ${tile("Valeur estimée", fE(m.value), (p.share ?? 100) < 100 ? `quote-part ${p.share} % de ${fE(p.value)}` : "")}
-    ${tile("Net de crédit", fE(m.equity))}
-    ${tile("Plus-value latente", fE(m.gain), fP(m.gainPct, 1) + " vs coût total", tone(m.gain))}
+    ${tile("Net de crédit", fE(m.equity), m.apport && !m.apportLive ? "apport compté à l'acte" : m.apportLive ? "dont apport " + fE(m.apportLive) : "")}
+    ${tile("Plus-value latente", fE(m.gain), fP(m.gainPct, 1) + (m.apport ? " vs ton apport" : " vs coût total"), tone(m.gain))}
     ${tile("Cash-flow", fE(m.myCashflow) + "<small style='font-size:12px;font-weight:500'> /mois</small>", (p.share ?? 100) < 100 ? `ta part · bien entier ${fE(m.cashflow)}` : "après crédit et charges", tone(m.cashflow))}
   </div>
   ${p.address || p.holder || p.surface || p.notes ? `<section class="section"><h2>Le bien</h2><div class="panel kv">
@@ -531,7 +536,13 @@ function sheetProperty(p) {
     ${p.holder ? `<div><span>Détenu via</span><span>${esc(p.holder)}${(p.share ?? 100) < 100 ? ` · ta part ${p.share} %` : ""}</span></div>` : ""}
     ${p.notes ? `<div style="display:block"><span class="note">${esc(p.notes)}</span></div>` : ""}
   </div></section>` : ""}
-  <section class="section"><h2>Coût d'acquisition</h2><div class="panel kv">
+  ${m.apport ? `<section class="section"><h2>Ton apport</h2><div class="panel kv">
+    ${p.capital ? `<div><span>Capital social</span><span>${fE(p.capital)}</span></div>` : ""}
+    ${p.cca ? `<div><span>Compte courant d'associé (trésorerie)</span><span>${fE(p.cca)}</span></div>` : ""}
+    <div class="strong"><span>Total versé par toi</span><span>${fE(m.apport)}</span></div>
+    ${p.othersPaid ? `<div><span class="note">${esc(p.othersPaid)}</span></div>` : ""}
+  </div></section>` : ""}
+  <section class="section"><h2>Coût d'acquisition${(p.share ?? 100) < 100 ? " (bien entier)" : ""}</h2><div class="panel kv">
     <div><span>Prix d'achat</span><span>${fE(p.price)}</span></div>
     <div><span>Frais de notaire et d'acquisition</span><span>${fE(p.notary)}</span></div>
     <div><span>Travaux</span><span>${fE(p.works)}</span></div>
@@ -609,6 +620,7 @@ const F = {
   property: { title: "Bien immobilier", col: "properties", groups: [
     ["Le bien", [["name", "Nom", "text", { full: 1, req: 1, ph: "T2 Lyon 7e" }], ["address", "Adresse", "text", { full: 1, ph: "12 rue …, 69007 Lyon" }], ["type", "Usage", PROPERTY_TYPES], ["city", "Ville", "text"], ["kind", "Type de bien", "text", { ph: "Appartement, immeuble…" }], ["holder", "Détenu via", "text", { ph: "En direct, SCI…" }], ["surface", "Surface (m²)", "number"], ["share", "Quote-part détenue (%)", "number", { def: 100 }], ["bought", "Date d'achat", "date", { full: 1 }]]],
     ["Acquisition et valeur", [["price", "Prix d'achat (€)", "number", { req: 1 }], ["notary", "Frais de notaire et d'acquisition (€)", "number"], ["works", "Travaux (€)", "number"], ["value", "Valeur estimée (€)", "number"]]],
+    ["Ton apport (si détenu via une société)", [["capital", "Capital social versé (€)", "number"], ["cca", "Compte courant d'associé (€)", "number"]]],
     ["Loyers et charges", [["rent", "Loyer mensuel HC (€)", "number"], ["charges", "Copro non récup. / mois (€)", "number"], ["tax", "Taxe foncière / an (€)", "number"], ["pno", "Assurance PNO / an (€)", "number"], ["mgmt", "Gestion (% des loyers)", "number"], ["vacancy", "Vacance locative (%)", "number"]]]] },
   loan: { title: "Crédit", col: "loans", groups: [[null, [
     ["name", "Nom", "text", { full: 1, def: "Prêt immobilier" }], ["principal", "Montant emprunté (€)", "number", { req: 1 }], ["rate", "Taux nominal (%)", "number", { req: 1 }],
