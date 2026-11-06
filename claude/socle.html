@@ -113,7 +113,7 @@ svg text { fill: var(--muted); font-family: var(--font-body); font-size: 10px; }
   padding-bottom: env(safe-area-inset-bottom, 0px);
   padding-left: max(8px, env(safe-area-inset-left, 0px)); padding-right: max(8px, env(safe-area-inset-right, 0px));
 }
-.tabs nav { max-width: 760px; margin: 0 auto; display: grid; grid-template-columns: repeat(5, 1fr); }
+.tabs nav { max-width: 760px; margin: 0 auto; display: grid; grid-template-columns: repeat(6, 1fr); }
 .tab { appearance: none; background: none; border: 0; color: var(--muted); font: 500 12px var(--font-body); padding: 10px 4px 9px; display: grid; justify-items: center; gap: 3px; cursor: pointer; }
 .tab svg { width: 22px; height: 22px; }
 .tab[aria-current="page"] { color: var(--accent); }
@@ -372,6 +372,19 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
 .seg.acts .seg-b { background: transparent; border-style: dashed; font-size: 13px; padding: 6px 12px; }
 .seg.acts .seg-b::after { content: " ›"; color: var(--muted); }
 details.fold > summary .note b { font-family: var(--font-body); font-weight: 700; }
+
+/* Marchés */
+.idea { border-top: 1px solid var(--line); padding: 12px 2px; }
+.idea:first-child { border-top: 0; }
+.idea > summary { list-style: none; cursor: pointer; display: grid; gap: 7px; }
+.idea > summary::-webkit-details-marker { display: none; }
+.idea .gh { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; }
+.idea .chips { gap: 4px; }
+.tab { font-size: 10.5px; padding-inline: 2px; }
+.panel a, .note a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+.idea > summary::after { content: "Risques et source ›"; font-size: 12px; color: var(--accent); }
+.idea[open] > summary::after { content: "Masquer ‹"; }
+.sheet .sheet-head + .panel + .sheet-head .x { display: none; }
 </style>
 
 <div class="wrap">
@@ -390,6 +403,7 @@ details.fold > summary .note b { font-family: var(--font-body); font-weight: 700
     <button class="tab" data-tab="positions"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 18 9 12l4 3 7-8"/><path d="M15 7h5v5"/></svg>Positions</button>
     <button class="tab" data-tab="immobilier"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 11 12 4l9 7M5.5 9.5V20h13V9.5M10 20v-5h4v5"/></svg>Immobilier</button>
     <button class="tab" data-tab="budget"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7.5A2.5 2.5 0 0 1 6.5 5H18v4"/><rect x="3.5" y="8" width="17" height="11" rx="2.5"/><path d="M16 13.5h1.5"/></svg>Budget</button>
+    <button class="tab" data-tab="marches"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8.5"/><path d="m15.5 8.5-2 5-5 2 2-5z"/></svg>Marchés</button>
   </nav>
 </div>
 
@@ -491,11 +505,11 @@ function propertyMetrics(p, loans) {
 
 /* ---------------- État ---------------- */
 const S = { accounts: [], holdings: [], properties: [], parts: [], loans: [], snapshots: [], flows: [], ready: false, writable: true };
-const COLS = ["accounts", "holdings", "properties", "loans", "snapshots", "flows", "tx", "rules", "caps", "goals", "settings"];
+const COLS = ["accounts", "holdings", "properties", "loans", "snapshots", "flows", "tx", "rules", "caps", "goals", "settings", "market", "prices"];
 // profils : chaque compte / bien porte `profile` (absent = nathan). R garde tout, S ne montre que le profil choisi.
 const PROFILES = [{ k: "nathan", label: "Nathan" }, { k: "angelique", label: "Angélique" }, { k: "sci", label: "SCI" }, { k: "foyer", label: "Foyer" }];
 // biens d'une SCI : profile "sci" ; chaque associé voit ses parts (share %, partner = profil associé, nathan par défaut), pas l'immeuble
-const R = { accounts: [], holdings: [], properties: [], loans: [], snapshots: [], flows: [], tx: [], rules: [], caps: [], goals: [], settings: [] };
+const R = { accounts: [], holdings: [], properties: [], loans: [], snapshots: [], flows: [], tx: [], rules: [], caps: [], goals: [], settings: [], market: [], prices: [] };
 const openFolds = new Set();
 document.addEventListener("toggle", (e) => { const d = e.target; if (d?.dataset?.fold) d.open ? openFolds.add(d.dataset.fold) : openFolds.delete(d.dataset.fold); }, true);
 let profile = "nathan"; try { const v = localStorage.getItem("socle-profil"); if (PROFILES.some((p) => p.k === v)) profile = v; } catch { }
@@ -517,6 +531,7 @@ function applyProfile(k = profile) {
 }
 const isInvestType = (t) => !["courant", "livret"].includes(t);
 let histRange = "all", histSeries = "net";
+const INFL = 0.02; // inflation supposée : cible de la BCE
 let db = null, tab = "synthese", sheet = null;
 
 function portfolio() {
@@ -558,16 +573,23 @@ function spark(ys) {
   const d = pts.map((p, i) => `${i ? "L" : "M"}${p[0].toFixed(1)},${p[1].toFixed(1)}`).join("");
   return `<svg class="spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true"><path d="${d}L${W},${H}L0,${H}Z" fill="url(#sg)"/><defs><linearGradient id="sg" x1="0" x2="0" y1="0" y2="1"><stop offset="0" style="stop-color:var(--accent)" stop-opacity=".18"/><stop offset="1" style="stop-color:var(--accent)" stop-opacity="0"/></linearGradient></defs><path d="${d}" fill="none" style="stroke:var(--accent)" stroke-width="2" vector-effect="non-scaling-stroke" stroke-linejoin="round"/></svg>`;
 }
-function lineChart(points, label) {
+function realNote(h) {
+  if (h.length < 2) return "";
+  const a = h[0], b = h[h.length - 1], yrs = (b.x - a.x) / (365.25 * 864e5), nominal = b.y - a.y / Math.pow(1 + INFL, (Date.now() - a.x) / (365.25 * 864e5));
+  return `<div class="kv" style="margin-top:8px"><div><span>Enrichissement affiché</span><span class="${tone(nominal)}">${sg(nominal)}</span></div><div class="strong"><span>Enrichissement réel</span><span class="${tone(b.y - a.y)}">${sg(b.y - a.y)}</span></div></div>
+    <p class="note" style="margin-top:4px">Tes montants passés sont convertis en euros d'aujourd'hui avec une inflation de ${fP(INFL * 100, 0)} par an (cible de la BCE) sur ${String(Math.round(yrs * 10) / 10).replace(".", ",")} an${yrs >= 2 ? "s" : ""} : c'est ce que tu as vraiment gagné en pouvoir d'achat.</p>`;
+}
+function lineChart(points, label, ref) {
   if (points.length < 2) return `<p class="note">La courbe se construit toute seule : une photo de ton patrimoine net est enregistrée chaque jour où tu ouvres Socle.</p>`;
   const W = 320, H = 130, pl = 44, pr = 8, pt = 10, pb = 20;
-  const ys = points.map((p) => p.y), min = Math.min(...ys), max = Math.max(...ys);
+  const ys = [...points.map((p) => p.y), ...(ref > 0 ? [ref] : [])], min = Math.min(...ys), max = Math.max(...ys), small = max < 5000;
   const step = niceStep((max - min) / 3 || Math.abs(max) / 4 || 1000);
   const lo = Math.floor(min / step) * step, hi = Math.max(lo + step, Math.ceil(max / step) * step);
   const t0 = points[0].x, t1 = points[points.length - 1].x || t0 + 1;
   const X = (x) => pl + ((x - t0) / (t1 - t0 || 1)) * (W - pl - pr), Y = (y) => pt + (1 - (y - lo) / (hi - lo)) * (H - pt - pb);
   let grid = "";
-  for (let v = lo; v <= hi + 1e-6; v += step) grid += `<line x1="${pl}" x2="${W - pr}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--line)" stroke-dasharray="2 4"/><text x="${pl - 6}" y="${Y(v) + 3}" text-anchor="end">${discret ? "" : (v / 1000).toLocaleString("fr-FR", { maximumFractionDigits: step < 1000 ? 1 : 0 }) + " k€"}</text>`;
+  for (let v = lo; v <= hi + 1e-6; v += step) grid += `<line x1="${pl}" x2="${W - pr}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--line)" stroke-dasharray="2 4"/><text x="${pl - 6}" y="${Y(v) + 3}" text-anchor="end">${discret && !small ? "" : small ? v.toLocaleString("fr-FR", { maximumFractionDigits: step < 1 ? 2 : step < 10 ? 1 : 0 }) + " €" : (v / 1000).toLocaleString("fr-FR", { maximumFractionDigits: step < 1000 ? 1 : 0 }) + " k€"}</text>`;
+  if (ref > 0) grid += `<line x1="${pl}" x2="${W - pr}" y1="${Y(ref)}" y2="${Y(ref)}" stroke="var(--gold)" stroke-width="1.2" stroke-dasharray="5 4"/><text x="${W - pr}" y="${Y(ref) - 4}" text-anchor="end" style="fill:var(--gold)">PRU</text>`;
   const d = points.map((p, i) => `${i ? "L" : "M"}${X(p.x).toFixed(1)},${Y(p.y).toFixed(1)}`).join("");
   const area = `${d}L${X(t1)},${H - pb}L${X(t0)},${H - pb}Z`;
   const fmt = (t) => new Date(t).toLocaleDateString("fr-FR", { month: "short", year: "2-digit" });
@@ -591,11 +613,12 @@ function viewSynthese(P) {
   const cf = rental.reduce((s, p) => s + p.m.myCashflow, 0) + P.partRows.reduce((s, p) => s + p.m.myCashflow, 0);
   const allSnaps = S.snapshots.filter((s) => /^\d{4}-\d{2}-\d{2}$/.test(s.id)).sort((a, b) => a.id.localeCompare(b.id));
   const snaps = histSeries === "inv" ? allSnaps.filter((s) => s.inv != null) : allSnaps.filter((s) => s.assets != null);
-  const allHist = snaps.map((s) => ({ x: new Date(s.id).getTime(), y: histSeries === "inv" ? s.inv : s.assets - s.debts }));
+  // après inflation : chaque valeur passée est exprimée en euros d'aujourd'hui (hypothèse INFL %/an)
+  const allHist = snaps.map((s) => { const x = new Date(s.id).getTime(), v = histSeries === "inv" ? s.inv : s.assets - s.debts; return { x, y: histSeries === "real" ? v * Math.pow(1 + INFL, (Date.now() - x) / (365.25 * 864e5)) : v }; });
   const netSnaps = allSnaps.filter((s) => s.assets != null), first = netSnaps.length ? { x: new Date(netSnaps[0].id).getTime(), y: netSnaps[0].assets - netSnaps[0].debts } : null, delta = first ? P.net - first.y : 0;
   const days = { "1m": 31, "3m": 92, "1a": 366 }[histRange];
   const hist = days ? allHist.filter((p) => p.x >= Date.now() - days * 864e5) : allHist;
-  const dec = histSeries === "inv" ? null : decomposition(P, snaps.length ? snaps[0] : null, hist.length ? snaps.find((s) => new Date(s.id).getTime() === hist[0].x) : null);
+  const dec = histSeries !== "net" ? null : decomposition(P, snaps.length ? snaps[0] : null, hist.length ? snaps.find((s) => new Date(s.id).getTime() === hist[0].x) : null);
   return `
   <section class="hero">
     <div class="eyebrow">Patrimoine net</div>
@@ -618,9 +641,9 @@ function viewSynthese(P) {
   </section>
   <section class="section">
     <div class="section-head"><h2>Évolution du patrimoine net</h2></div>
-    <div class="seg" role="tablist" aria-label="Série" style="margin-bottom:8px">${[["net", "Patrimoine net"], ["inv", "Placements"]].map(([k, l]) => `<button role="tab" class="seg-b" aria-selected="${histSeries === k}" data-series="${k}">${l}</button>`).join("")}</div>
+    <div class="seg" role="tablist" aria-label="Série" style="margin-bottom:8px">${[["net", "Patrimoine net"], ["real", "Après inflation"], ["inv", "Placements"]].map(([k, l]) => `<button role="tab" class="seg-b" aria-selected="${histSeries === k}" data-series="${k}">${l}</button>`).join("")}</div>
     <div class="seg" role="tablist" aria-label="Période" style="margin-bottom:10px">${[["1m", "1 mois"], ["3m", "3 mois"], ["1a", "1 an"], ["all", "Tout"]].map(([k, l]) => `<button role="tab" class="seg-b" aria-selected="${histRange === k}" data-range="${k}">${l}</button>`).join("")}</div>
-    <div class="panel">${lineChart(hist, histSeries === "inv" ? "Évolution des placements" : "Évolution du patrimoine net")}${histSeries === "inv" ? `<p class="note" style="margin-top:6px">Valeur de tes placements (PEA, CTO, assurance-vie, épargne salariale), versements compris.</p>` : ""}</div>
+    <div class="panel">${lineChart(hist, histSeries === "inv" ? "Évolution des placements" : "Évolution du patrimoine net")}${histSeries === "inv" ? `<p class="note" style="margin-top:6px">Valeur de tes placements (PEA, CTO, assurance-vie, épargne salariale), versements compris.</p>` : ""}${histSeries === "real" ? realNote(hist) : ""}</div>
     ${dec ? `<div class="panel kv" style="margin-top:10px">
       <div class="strong"><span>Variation depuis le ${dec.from}</span><span class="${tone(dec.total)}">${sg(dec.total)}</span></div>
       <div><span>Performance des placements</span><span class="${tone(dec.market)}">${sg(dec.market)}${dec.marketPct != null ? ` · ${dec.marketPct >= 0 ? "+" : ""}${fP(dec.marketPct, 1)}` : ""}</span></div>
@@ -632,7 +655,7 @@ function viewSynthese(P) {
   ${profile === "sci" ? "" : `<div class="seg acts" style="margin-top:10px"><button class="seg-b" data-act="sim">Et si j'achète ?</button><button class="seg-b" data-act="year">Bilan de l'année</button></div>`}
   ${stack("Ton avenir", [projSection(P), fireSection(P)])}
   ${stack("Performance", [benchSection(P), ytdTable(P), costTable(P), passiveSection(P), rebalSection(P)])}
-  ${stack("Frais et impôts", [feesTable(P), taxSection(P), taxIRSection(P)])}`;
+  ${stack("Frais et impôts", [feesTable(P), taxSection(P), taxIRSection(P), perSection(P)])}`;
 }
 // regroupe des volets repliables dans une seule carte, sous un petit titre
 function stack(title, parts) {
@@ -1408,12 +1431,36 @@ function fixedCharges() {
   const auto = items.reduce((x, i) => x + i.amt, 0), manual = num(setOf(profile).fixed) || 0;
   return { items, auto, manual, total: manual || auto };
 }
+
+// onglet Marchés : collection market, doc "latest" écrit chaque soir par la tâche programmée (la page ne peut pas aller sur le web)
+// {date, mood, summary, indices:[{name, value, d1, ytd}], news:[{title, src, url, impact, why}], ideas:[{name, isin, ticker, type, env:["PEA","CTO"], thesis, risks, horizon, price, cur, src, url}], watch:[...]}
+let mEnv = "all";
+function viewMarket(P) {
+  const m = R.market.find((x) => x.id === "latest");
+  if (!m) return `<section class="hero"><div class="eyebrow">Marchés</div><div class="big" style="font-size:30px">Bientôt ici</div><div class="sub">Le point marchés arrive avec la mise à jour du soir.</div></section>`;
+  const mine = new Set(R.holdings.filter((h) => ownerOf(R.accounts.find((a) => a.id === h.accountId) || {}) === profile || profile === "foyer").map((h) => h.isin).filter(Boolean));
+  const pc = (v) => v == null ? "" : `<span class="${v >= 0 ? "gain" : "loss"}">${v >= 0 ? "+" : "−"}${String(Math.abs(v).toFixed(1)).replace(".", ",")} %</span>`;
+  const ideas = (m.ideas || []).filter((i) => mEnv === "all" || (i.env || []).includes(mEnv));
+  const impact = { pos: ["▲", "gain"], neg: ["▼", "loss"], neu: ["•", ""] };
+  const d = m.date ? new Date(m.date).toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" }) : "";
+  return `<section class="hero"><div class="eyebrow">Marchés · ${esc(d)}</div><div class="big" style="font-size:clamp(26px,7vw,34px);line-height:1.15">${esc(m.mood || "Le point du jour")}</div><div class="sub">${esc(m.summary || "")}</div></section>
+  ${(m.indices || []).length ? `<div class="grid2 grid4" style="margin-top:14px">${m.indices.map((x) => `<div class="tile"><div class="k">${esc(x.name)}</div><div class="v">${esc(String(x.value))}</div><div class="s">${x.d1 != null ? pc(x.d1) + " jour" : "&nbsp;"}${x.ytd != null ? ` · ${pc(x.ytd)} sur l'année` : ""}</div></div>`).join("")}</div>` : ""}
+  ${(m.news || []).length ? `<section class="section"><h2>Ce qui fait bouger les marchés</h2><div class="panel list">${m.news.map((n) => { const [ic, cl] = impact[n.impact] || impact.neu; return `<div class="row" style="cursor:default;grid-template-columns:18px minmax(0,1fr)"><b class="${cl}">${ic}</b><span style="min-width:0"><span class="name" style="white-space:normal;display:block">${esc(n.title)}</span><span class="note">${esc(n.why || "")}${n.src ? ` · ${n.url ? `<a href="${esc(n.url)}" target="_blank" rel="noopener">${esc(n.src)}</a>` : esc(n.src)}` : ""}</span></span></div>`; }).join("")}</div></section>` : ""}
+  <section class="section"><div class="section-head"><h2>Idées à étudier</h2><span class="note">${ideas.length} idée${ideas.length > 1 ? "s" : ""}</span></div>
+    <div class="seg" role="tablist" aria-label="Enveloppe">${[["all", "Tout"], ["PEA", "PEA"], ["CTO", "CTO"]].map(([k, l]) => `<button role="tab" class="seg-b" aria-selected="${mEnv === k}" data-menv="${k}">${l}</button>`).join("")}</div>
+    <div class="panel goals">${ideas.map((i) => `<details class="idea"><summary><span class="gh"><b>${esc(i.name)}</b><span class="note">${i.price != null ? `${String(i.price).replace(".", ",")} ${esc(i.cur || "€")}` : ""}</span></span>
+      <span class="chips">${(i.env || []).map((e) => `<span class="pill">${esc(e)}</span>`).join("")}<span class="pill">${esc(i.type || "")}</span>${i.horizon ? `<span class="pill">${esc(i.horizon)}</span>` : ""}${mine.has(i.isin) ? `<span class="pill" style="background:color-mix(in srgb,var(--gain) 14%,transparent);color:var(--gain)">déjà en portefeuille</span>` : ""}</span>
+      <span class="note" style="color:var(--fg)">${esc(i.thesis || "")}</span></summary>
+      <div class="kv" style="margin-top:8px">${i.risks ? `<div><span>Risques</span></div><p class="note" style="margin:0">${esc(i.risks)}</p>` : ""}${i.isin ? `<div><span>ISIN</span><span>${esc(i.isin)}${i.ticker ? ` · ${esc(i.ticker)}` : ""}</span></div>` : ""}${i.src ? `<div><span>Source</span><span>${i.url ? `<a href="${esc(i.url)}" target="_blank" rel="noopener">${esc(i.src)}</a>` : esc(i.src)}</span></div>` : ""}</div></details>`).join("") || `<div class="empty">Aucune idée pour cette enveloppe aujourd'hui.</div>`}</div>
+    <p class="note">Pistes repérées dans l'actualité et les analyses publiées, pas des conseils personnalisés : vérifie avant d'acheter et garde ta répartition cible en tête. Les marchés peuvent baisser.</p></section>`;
+}
 // objectifs : collection goals {profile, name, target, accounts[], date?}
 function goalsSection(P) {
   const goals = R.goals.filter((g) => profile === "foyer" || g.profile === profile || g.profile === "foyer");
   const av = avgSaving(), pace = av ? Math.max(0, av.save) : 0;
   const rows = goals.map((g) => {
     if (g.kind === "wealth" || g.kind === "immo") return goalRowX(g, P);
+    if (g.kind === "pot") return potRow(g);
     const cur = P.accRows.filter((a) => (g.accounts || []).includes(a.id)).reduce((s, a) => s + a.value, 0);
     const pct = g.target ? Math.min(100, (cur / g.target) * 100) : 0, left = Math.max(0, g.target - cur);
     let eta = left <= 0 ? "Objectif atteint" : pace > 0 ? `au rythme actuel (${fE(pace)}/mois) : ${new Date(Date.now() + (left / pace) * 30.4 * 864e5).toLocaleDateString("fr-FR", { month: "long", year: "numeric" })}` : "épargne nette nulle ces derniers mois : pas d'estimation";
@@ -1427,6 +1474,7 @@ function goalsSection(P) {
   const sugg = `<div class="seg" style="margin-top:8px;flex-wrap:wrap">
       ${goals.some((g) => g.kind === "wealth") ? "" : `<button class="seg-b" data-act="goal-new-kind" data-kind="wealth">+ 1 M€ de patrimoine</button>`}
       ${goals.some((g) => g.kind === "immo") ? "" : `<button class="seg-b" data-act="goal-new-kind" data-kind="immo">+ Projet immobilier</button>`}
+      <button class="seg-b" data-act="goal-new-kind" data-kind="pot">+ Cagnotte de projet</button>
       </div>` + (goals.length ? "" : `<div class="seg" style="margin-top:6px">
       ${livA ? `<button class="seg-b" data-act="new-goal" data-preset='${esc(JSON.stringify({ name: "Livret A au plafond", target: 22950, accounts: [livA.id] }))}'>+ Livret A au plafond</button>` : ""}
       ${av ? `<button class="seg-b" data-act="new-goal" data-preset='${esc(JSON.stringify({ name: "Réserve de 6 mois de charges fixes", target: Math.round((fixedCharges()?.total || av.out) * 6 / 100) * 100, accounts: liq }))}'>+ Réserve de 6 mois</button>` : ""}</div>`);
@@ -2067,6 +2115,7 @@ function sheetGoalChooser() {
   return `<div class="sheet-head"><h2>Nouvel objectif</h2><button class="x" data-act="close" aria-label="Fermer">×</button></div>
     <div class="panel list">
       <button class="row" data-act="goal-new-kind" data-kind="accounts"><span><div class="name">Épargner un montant</div><div class="meta">sur un ou plusieurs comptes : Livret A au plafond, réserve, voyage…</div></span><span class="amt">›</span></button>
+      <button class="row" data-act="goal-new-kind" data-kind="pot"><span><div class="name">Cagnotte de projet</div><div class="meta">voyage, moto, mariage… : un montant, une date, ce qu'il faut mettre de côté chaque mois</div></span><span class="amt">›</span></button>
       <button class="row" data-act="goal-new-kind" data-kind="wealth"><span><div class="name">Atteindre un patrimoine</div><div class="meta">par exemple 1 million d'euros de patrimoine financier, avec le chemin pour y arriver</div></span><span class="amt">›</span></button>
       <button class="row" data-act="goal-new-kind" data-kind="immo"><span><div class="name">Acheter un logement</div><div class="meta">prêt, mensualité, taux du jour, PTZ et apport à réunir</div></span><span class="amt">›</span></button>
     </div>`;
@@ -2114,6 +2163,7 @@ async function saveGoalX(form) {
   const n = (k) => { const v = String(fd.get(k) ?? "").trim(); return v === "" ? null : num(v); };
   let data = { kind: gk, name: String(fd.get("name")).trim(), date: String(fd.get("date") || "") || null };
   if (gk === "wealth") data = { ...data, target: n("target"), ret: n("ret") || 5, basis: String(fd.get("basis")) };
+  else if (gk === "pot") data = { ...data, target: n("target"), saved: n("saved") || 0, icon: String(fd.get("icon") || "").trim().slice(0, 4) };
   else data = { ...data, price: n("price"), works: n("works") || 0, kind: "immo", type: String(fd.get("kind")), zone: String(fd.get("zone")), apport: n("apport") || 0, years: n("years") || 20, rate: n("rate"), ins: n("ins") ?? 0.3, income: n("income"), persons: n("persons") || 2, rfr: n("rfr"), primo: !!fd.get("primo"), accounts: fd.getAll("acc").map(String) };
   if (gk === "immo") data.target = data.apport;
   btn.disabled = true; btn.textContent = "Enregistrement…";
@@ -2122,6 +2172,45 @@ async function saveGoalX(form) {
     else await db.collection("goals").add({ ...data, profile, createdAt: new Date().toISOString() });
     closeSheet();
   } catch (err) { showErr(err); btn.disabled = false; btn.textContent = "Enregistrer"; }
+}
+
+// cagnottes de projet : goals {kind: "pot", name, target, date, saved, icon, log:[{d, a}]}
+function potCalc(g) {
+  const left = Math.max(0, (g.target || 0) - (g.saved || 0)), pct = g.target ? Math.min(100, ((g.saved || 0) / g.target) * 100) : 0;
+  const months = g.date ? Math.max(0, (new Date(g.date) - Date.now()) / (30.4 * 864e5)) : null;
+  return { left, pct, months, monthly: left > 0 && months != null ? left / Math.max(1, months) : null };
+}
+function potRow(g) {
+  const c = potCalc(g);
+  return `<button class="goal" data-act="edit-goal" data-id="${g.id}"><span class="gh"><b>${g.icon ? esc(g.icon) + " " : ""}${esc(g.name)}</b><span>${fE(g.saved || 0)} <small>/ ${fE(g.target)}</small></span></span>
+    <span class="bar"><i style="width:${c.pct.toFixed(1)}%;${c.pct >= 100 ? "background:var(--gain)" : ""}"></i></span>
+    <span class="note">${c.left <= 0 ? "Cagnotte pleine" : `il manque ${fE(c.left)}`}${c.monthly != null ? ` · ${fE(c.monthly)}/mois jusqu'au ${new Date(g.date).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })}` : ""}</span></button>`;
+}
+function sheetGoalPot(g) {
+  const d = g || { name: "", target: "", saved: 0 }, c = g ? potCalc(g) : null;
+  return `<div class="sheet-head"><h2>${g ? esc(g.name) : "Nouvelle cagnotte"}</h2><button class="x" data-act="close" aria-label="Fermer">×</button></div>
+  ${g ? `<div class="panel kv" style="margin-bottom:14px">
+    <div class="strong"><span>Dans la cagnotte</span><span>${fE(g.saved || 0)} / ${fE(g.target)}</span></div>
+    ${c.monthly != null ? `<div><span>À mettre de côté</span><span><b>${fE(c.monthly)}</b>/mois</span></div>` : ""}
+    <div><span>Ajouter ou retirer</span><span><input class="inl" id="pot-amt" inputmode="decimal" placeholder="+50 ou −20"> <button class="btn sm" type="button" data-act="pot-add" data-id="${g.id}">OK</button></span></div>
+    ${(g.log || []).slice(-5).reverse().map((l) => `<div><span class="note">${new Date(l.d).toLocaleDateString("fr-FR")}</span><span class="note">${l.a >= 0 ? "+" : "−"}${fE(Math.abs(l.a))}</span></div>`).join("")}
+  </div>` : ""}
+  <form class="f" data-kind="goalx" data-gk="pot" data-id="${g?.id || ""}"><fieldset>
+    <label class="full">Projet<input name="name" value="${esc(d.name)}" placeholder="Voyage au Japon" required></label>
+    <label>Montant visé (€)<input name="target" inputmode="decimal" value="${d.target ?? ""}" required></label>
+    <label>Pour quand<input name="date" type="date" value="${esc(d.date || "")}"></label>
+    <label>Déjà de côté (€)<input name="saved" inputmode="decimal" value="${d.saved ?? 0}"></label>
+    <label>Emoji (facultatif)<input name="icon" value="${esc(d.icon || "")}" placeholder="✈️"></label>
+  </fieldset><p class="note">La cagnotte n'est liée à aucun compte : tu notes ce que tu mets de côté pour ce projet, où que soit l'argent.</p>
+  <p class="err" id="form-err" hidden></p>
+  <div class="actions"><button class="btn" type="submit">Enregistrer</button>${g?.id ? `<button class="btn danger" type="button" data-act="delete" data-kind="goal" data-id="${g.id}">Supprimer</button>` : ""}</div></form>`;
+}
+async function potAdd(t) {
+  const g = R.goals.find((x) => x.id === t.dataset.id), inp = document.getElementById("pot-amt"); if (!g || !inp) return;
+  const a = num(String(inp.value).replace("−", "-")); if (!a) return;
+  t.disabled = true;
+  try { const { id: _i, ...old } = g; await db.collection("goals").doc(g.id).set({ ...old, saved: Math.max(0, (g.saved || 0) + a), log: [...(g.log || []), { d: new Date().toISOString().slice(0, 10), a }].slice(-24), updatedAt: new Date().toISOString() }); setTimeout(() => openSheet({ html: sheetGoalPot(R.goals.find((x) => x.id === g.id) || g) }), 250); }
+  catch (err) { showErr(err); t.disabled = false; }
 }
 const immoG = (g) => ({ ...g, kind: g.type || "ancien" }); // le type de bien est rangé dans "type"
 function goalRowX(g, P) {
@@ -2282,6 +2371,31 @@ function irCalc(revs, couple, per = 0) {
   const each = net.map((rni, i) => one(rni - (i === 0 ? per : 0), 1, false));
   return { total: each.reduce((a, b) => a + b, 0), tmi: tmi(net[0] - per, 1), each };
 }
+
+// simulateur PER : économie d'impôt selon la tranche, effort réel, plafond, valeur à la retraite
+let perSim = null;
+function perSection(P) {
+  if (profile !== "nathan" && profile !== "angelique") return "";
+  const st = setOf("tax"), other = profile === "nathan" ? "angelique" : "nathan";
+  const salary = (k) => withProfile(k, () => { const D = withScope("perso", budgetData), now = curMonth(); const ms = [...new Set(D.tx.map((t) => ym(t.date)))].filter((m) => m < now).sort().slice(-3); return ms.length ? Math.round(ms.reduce((s, m) => s + D.tx.filter((t) => ym(t.date) === m && t.c === "salaire").reduce((x, t) => x + t.amount, 0), 0) / ms.length * 12) : 0; });
+  const me = st[profile] ?? salary(profile), them = st[other] ?? salary(other);
+  if (!me) return `<details class="section fold" data-fold="per" ${openFolds.has("per") ? "open" : ""}><summary><span class="fold-t"><h2>Simulateur PER</h2><span class="note">renseigne tes revenus dans « Impôt sur le revenu »</span></span><b></b></summary></details>`;
+  const plaf = Math.max(4710, Math.round((me - Math.min(IR.abatMax, Math.max(IR.abatMin, me * 0.1))) * 0.1));
+  const amt = perSim ?? Math.min(plaf, 1200), revs = [me, them], couple = !!st.couple;
+  const base = irCalc(revs, couple, 0), withP = irCalc(revs, couple, amt), save = Math.max(0, base.total - withP.total);
+  const by = setOf(profile).birthYear, years = by ? Math.max(1, 64 - (new Date().getFullYear() - by)) : 25, fv = (a) => a * Math.pow(1.05, years);
+  return `<details class="section fold" data-fold="per" ${openFolds.has("per") ? "open" : ""}><summary><span class="fold-t"><h2>Simulateur PER</h2><span class="note">tranche marginale ${fP(base.tmi * 100, 0)} · plafond ≈ ${fE(plaf)}</span></span><b class="${save ? "gain" : ""}">${save ? "−" + fE(save) : "0 €"}<small> d'impôt</small></b></summary>
+    <label class="rng">Versement sur l'année <b>${fE(amt)}</b><input type="range" id="per-sim" min="0" max="${plaf}" step="100" value="${amt}"></label>
+    <div class="panel kv">
+      <div><span>Impôt économisé</span><span class="gain">${fE(save)}</span></div>
+      <div><span>Effort réel (versement − économie)</span><span>${fE(amt - save)}</span></div>
+      <div><span>Soit par mois</span><span>${fE(amt / 12)} versés · ${fE((amt - save) / 12)} réels</span></div>
+      <div class="strong"><span>Valeur à 64 ans (${years} ans à 5 %/an)</span><span>${fE(fv(amt))}</span></div>
+      <div><span>Si tu verses ${fE(amt)} chaque année</span><span>${fE(amt * ((Math.pow(1.05, years) - 1) / 0.05))}</span></div>
+    </div>
+    <p class="note" style="margin-top:6px">${base.tmi <= 0.11 ? "À 11 % ou moins, l'avantage est faible : à la sortie, le capital est imposé au barème, souvent au même taux. Le PEA ou l'assurance-vie restent plus souples. " : "À 30 % ou plus, le PER est intéressant : tu économises maintenant à un taux souvent plus haut qu'à la retraite. "}L'argent est bloqué jusqu'à la retraite (sauf achat de ta résidence principale et accidents de la vie). Plafond estimé : 10 % de tes revenus nets, au moins 4 710 €, plus les plafonds non utilisés des 3 dernières années (voir ton avis d'impôt). Ton PERCOL Epsor est déjà un PER.${by ? "" : " Ajoute ton année de naissance (Indépendance financière) pour un horizon exact."}</p></details>`;
+}
+document.addEventListener("input", (e) => { if (e.target.id !== "per-sim") return; perSim = Number(e.target.value); openFolds.add("per"); const y = window.scrollY; render(); window.scrollTo(0, y); const r = document.getElementById("per-sim"); if (r) r.focus(); });
 function taxIRSection(P) {
   if (profile === "sci") return "";
   const st = setOf("tax"), keep = (k) => withProfile(k, () => { const D = withScope("perso", budgetData), now = curMonth(); const ms = [...new Set(D.tx.map((t) => ym(t.date)))].filter((m) => m < now).sort().slice(-3); return ms.length ? Math.round(ms.reduce((s, m) => s + D.tx.filter((t) => ym(t.date) === m && t.c === "salaire").reduce((a, t) => a + t.amount, 0), 0) / ms.length * 12) : 0; });
@@ -2388,7 +2502,8 @@ function formHtml(kind, data, extra) {
     return `<label class="${o.full ? "full" : ""}" for="${id}">${label}${input}</label>`;
   };
   return `
-  <div class="sheet-head"><h2>${data && !data.__new ? (kind === "property" ? "Paramètres du bien" : "Modifier : " + f.title.toLowerCase()) : "Ajouter : " + f.title.toLowerCase()}</h2><button class="x" data-act="close" aria-label="Fermer">×</button></div>
+  ${kind === "holding" && data?.id && !data.__new ? `<div class="sheet-head"><h2>Position</h2><button class="x" data-act="close" aria-label="Fermer">×</button></div>${holdingChart(data)}` : ""}
+  <div class="sheet-head"${kind === "holding" && data?.id && !data.__new ? ' style="margin-top:4px"' : ""}><h2>${data && !data.__new ? (kind === "property" ? "Paramètres du bien" : "Modifier : " + f.title.toLowerCase()) : "Ajouter : " + f.title.toLowerCase()}</h2><button class="x" data-act="close" aria-label="Fermer">×</button></div>
   <form class="f" data-kind="${kind}" data-id="${data?.id || ""}" data-parent="${extra?.parent || ""}">
     ${f.groups.map(([lg, fs]) => `<fieldset>${lg ? `<legend>${lg}</legend>` : ""}${fs.map(field).join("")}</fieldset>`).join("")}
     <p class="err" id="form-err" hidden></p>
@@ -2445,6 +2560,26 @@ async function snapshotToday() {
   }
   applyProfile();
   for (const [id, d] of todo) { try { await db.collection("snapshots").doc(id).set(d); } catch { /* lecture seule */ } }
+  recordPrices();
+}
+// historique des cours : collection prices, un document par position {pts: [[date, cours], ...]}, complété à chaque nouveau cours
+async function recordPrices() {
+  const day = new Date().toISOString().slice(0, 10);
+  for (const h of R.holdings) {
+    if (!(h.price > 0) || h.cls === "fonds_euro") continue;
+    const d = (h.priceDate || day).slice(0, 10), doc = R.prices.find((x) => x.id === h.id), pts = doc?.pts || [];
+    const last = pts[pts.length - 1];
+    if (last && (last[0] >= d || (last[0] === d && last[1] === h.price))) continue;
+    try { await db.collection("prices").doc(h.id).set({ pts: [...pts, [d, Math.round(h.price * 10000) / 10000]].slice(-400) }); } catch { return; }
+  }
+}
+function holdingChart(h) {
+  const pts = (R.prices.find((x) => x.id === h.id)?.pts || []).map(([d, v]) => ({ x: new Date(d).getTime(), y: v }));
+  const first = pts[0], last = pts[pts.length - 1];
+  const head = `<div class="panel" style="margin-bottom:14px"><div class="section-head"><h2>${esc(h.name)}</h2><span class="note">PRU ${fE(h.pru)} · cours ${fE(h.price)}</span></div>`;
+  if (pts.length < 2) return head + `<p class="note">La courbe du cours se construit toute seule : chaque nouveau cours (mis à jour en semaine le soir) est gardé. Reviens dans quelques jours.</p></div>`;
+  const ch = (last.y / first.y - 1) * 100, pv = (h.price - h.pru) * h.qty;
+  return head + lineChart(pts, "Cours de " + h.name, h.pru) + `<div class="kv" style="margin-top:6px"><div><span>Depuis le ${new Date(first.x).toLocaleDateString("fr-FR", { day: "numeric", month: "short" })}</span><span class="${tone(ch)}">${ch >= 0 ? "+" : "−"}${fP(Math.abs(ch), 1)}</span></div><div><span>Plus-value latente</span><span class="${tone(pv)}">${sg(pv)}</span></div></div></div>`;
 }
 
 /* ---------------- Rendu ---------------- */
@@ -2461,7 +2596,7 @@ function render() {
   const P = portfolio();
   const pb = document.getElementById("profiles");
   if (pb) pb.innerHTML = PROFILES.map((p) => `<button role="tab" class="prof" aria-selected="${p.k === profile}" data-profile="${p.k}"><span class="av-s">${p.k === "foyer" ? "∞" : p.label.charAt(0)}</span>${p.label}</button>`).join("");
-  $("#view").innerHTML = tab === "comptes" ? viewComptes(P) : tab === "positions" ? viewPositions(P) : tab === "immobilier" ? viewImmo(P) : tab === "budget" ? viewBudget() : viewSynthese(P);
+  $("#view").innerHTML = tab === "comptes" ? viewComptes(P) : tab === "positions" ? viewPositions(P) : tab === "immobilier" ? viewImmo(P) : tab === "budget" ? viewBudget() : tab === "marches" ? viewMarket(P) : viewSynthese(P);
   document.querySelectorAll(".tab").forEach((t) => t.setAttribute("aria-current", t.dataset.tab === tab ? "page" : "false"));
   if (sheet && sheet.live) openSheet(sheet, true);
   else if (pendingOpen) openPending();
@@ -2485,7 +2620,7 @@ function openForm(kind, data, extra) {
 function goBack() { const b = sheet?.back; if (b) openSheet(b); else closeSheet(); }
 
 function setTab(t) {
-  tab = ["synthese", "comptes", "positions", "immobilier", "budget"].includes(t) ? t : "synthese";
+  tab = ["synthese", "comptes", "positions", "immobilier", "budget", "marches"].includes(t) ? t : "synthese";
   if (location.hash.slice(1) !== tab) { try { history.replaceState(null, "", "#" + tab); } catch {} }
   render(); window.scrollTo(0, 0);
 }
@@ -2504,6 +2639,7 @@ document.addEventListener("click", async (e) => {
   const bc = e.target.closest("[data-bcat]"); if (bc) { bCat = bCat === bc.dataset.bcat ? null : bc.dataset.bcat; render(); document.querySelector(".txr, .dayh")?.closest("section")?.scrollIntoView({ behavior: "smooth", block: "start" }); return; }
   const ps = e.target.closest("[data-possort]"); if (ps) { posSort = ps.dataset.possort; return render(); }
   const rg = e.target.closest("[data-range]"); if (rg) { histRange = rg.dataset.range; return render(); }
+  const me = e.target.closest("[data-menv]"); if (me) { mEnv = me.dataset.menv; return render(); }
   const se = e.target.closest("[data-series]"); if (se) { histSeries = se.dataset.series; return render(); }
   const t = e.target.closest("[data-tab],[data-act]"); if (!t) return;
   if (t.dataset.tab) return setTab(t.dataset.tab);
@@ -2517,7 +2653,7 @@ document.addEventListener("click", async (e) => {
   if (act === "tx-import-run") return runImport(t);
   if (act === "tx-caps") return openSheet({ html: sheetCaps(lastAvgs) });
   if (act === "goal-choose") return openSheet({ html: sheetGoalChooser() });
-  if (act === "goal-new-kind") { const k = t.dataset.kind; return openSheet({ html: k === "wealth" ? sheetGoalWealth() : k === "immo" ? sheetGoalImmo() : sheetGoal(null) }); }
+  if (act === "goal-new-kind") { const k = t.dataset.kind; return openSheet({ html: k === "wealth" ? sheetGoalWealth() : k === "immo" ? sheetGoalImmo() : k === "pot" ? sheetGoalPot() : sheetGoal(null) }); }
   if (act === "goal-detail") { const g = R.goals.find((y) => y.id === id); return g && openSheet({ html: g.kind === "immo" ? sheetImmoDetail(g) : sheetWealthDetail(g) }); }
   if (act === "goal-edit-form") { const g = R.goals.find((y) => y.id === id); return g && openSheet({ html: g.kind === "immo" ? sheetGoalImmo(immoG(g)) : sheetGoalWealth(g) }); }
   if (act === "sim") return openSheet({ html: sheetSim() });
@@ -2528,7 +2664,8 @@ document.addEventListener("click", async (e) => {
   if (act === "budget-settings") return openSheet({ html: sheetBudgetSettings() });
   if (act === "alloc-edit") return openSheet({ html: sheetAlloc() });
   if (act === "new-goal") { let pre = null; try { pre = t.dataset.preset ? JSON.parse(t.dataset.preset) : null; } catch { } return openSheet({ html: sheetGoal(pre) }); }
-  if (act === "edit-goal") { const g = R.goals.find((y) => y.id === id); return g && openSheet({ html: sheetGoal(g) }); }
+  if (act === "edit-goal") { const g = R.goals.find((y) => y.id === id); return g && openSheet({ html: g.kind === "pot" ? sheetGoalPot(g) : sheetGoal(g) }); }
+  if (act === "pot-add") return potAdd(t);
   if (act === "open-account") openSheet({ type: "account", id, live: true });
   else if (act === "open-property") openSheet({ type: "property", id, live: true });
   else if (act === "monthly") openSheet({ html: sheetMonthly() });
