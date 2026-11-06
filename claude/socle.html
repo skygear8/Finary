@@ -985,7 +985,7 @@ function viewBudget() {
   <div class="grid2 grid4">
     ${tile("Revenus", fE(T.inc), avg("salaire") != null ? "moy. " + fE(withData.reduce((s, x) => s + x.inc, 0) / withData.length) : "")}
     ${tile("Dépenses", fE(T.out), withData.length ? "moy. " + fE(withData.reduce((s, x) => s + x.out, 0) / withData.length) : "")}
-    ${tile("Épargne placée", fE(T.save), "PEA, livrets, AV…")}
+    ${tile("Épargne nette", fE(T.save), "versée sur livrets et placements, moins les retraits", T.save < 0 ? "loss" : "")}
     ${tile("Taux d'épargne", rate != null ? fP(rate, 0) : "—", "part des revenus non dépensée", rate != null ? tone(rate) : "")}
   </div>
   <div class="section">${scopeSeg}</div>
