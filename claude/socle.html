@@ -225,6 +225,12 @@ details.fold > .section-head { margin-top: 6px; }
 .tab[aria-current="page"] { background: color-mix(in srgb, var(--accent) 12%, transparent); }
 .wrap { padding-bottom: calc(110px + env(safe-area-inset-bottom, 0px)); }
 .brand b svg { width: 18px; height: 18px; }
+.head-r { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.head-r .status { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.eye { appearance: none; flex: none; width: 36px; height: 36px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface); color: var(--fg); display: grid; place-items: center; cursor: pointer; box-shadow: var(--shadow); }
+.eye svg { width: 19px; height: 19px; }
+.eye[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.eye:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .hero + .grid2, .hero + .panel, .hero + .seg { margin-top: 14px; }
 .kv .strong:first-child { border-top: 0; margin-top: 0; padding-top: 6px; }
 @media (prefers-reduced-motion: no-preference) {
@@ -237,7 +243,7 @@ details.fold > .section-head { margin-top: 6px; }
 <div class="wrap">
   <header class="brand">
     <b><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5 15 14.5H1z" fill="var(--gold)"/></svg>Socle</b>
-    <span class="status" id="status">Chargement…</span>
+    <span class="head-r"><span class="status" id="status">Chargement…</span><button class="eye" id="eye" type="button" aria-pressed="false" aria-label="Masquer les montants" title="Masquer les montants"></button></span>
   </header>
   <main id="view"></main>
 </div>
@@ -271,8 +277,13 @@ const SLICES = [
 /* ---------------- Format ---------------- */
 const eur0 = new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR", maximumFractionDigits: 0 });
 const eur2 = new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR", minimumFractionDigits: 2, maximumFractionDigits: 2 });
-const fE = (v) => eur0.format(v || 0);
-const fE2 = (v) => eur2.format(v || 0);
+// mode discret : montants masqués, pourcentages visibles (préférence gardée sur cet appareil)
+let discret = false; try { discret = localStorage.getItem("socle-discret") === "1"; } catch { }
+const HID = "•••\u202f€";
+const fE = (v) => discret ? HID : eur0.format(v || 0);
+const fE2 = (v) => discret ? HID : eur2.format(v || 0);
+const fU = (v) => eur2.format(v || 0); // prix unitaire : public, toujours visible
+const fQ = (q) => discret ? "•••" : q.toLocaleString("fr-FR", { maximumFractionDigits: 6 });
 const fP = (v, d = 2) => (v < 0 ? "−" : "") + Math.abs(v || 0).toLocaleString("fr-FR", { minimumFractionDigits: d, maximumFractionDigits: d }) + " %";
 const tone = (v) => (v >= 0 ? "gain" : "loss");
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -392,7 +403,7 @@ function lineChart(points, label) {
   const t0 = points[0].x, t1 = points[points.length - 1].x || t0 + 1;
   const X = (x) => pl + ((x - t0) / (t1 - t0 || 1)) * (W - pl - pr), Y = (y) => pt + (1 - (y - lo) / (hi - lo)) * (H - pt - pb);
   let grid = "";
-  for (let v = lo; v <= hi + 1e-6; v += step) grid += `<line x1="${pl}" x2="${W - pr}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--line)" stroke-dasharray="2 4"/><text x="${pl - 6}" y="${Y(v) + 3}" text-anchor="end">${(v / 1000).toLocaleString("fr-FR", { maximumFractionDigits: step < 1000 ? 1 : 0 })} k€</text>`;
+  for (let v = lo; v <= hi + 1e-6; v += step) grid += `<line x1="${pl}" x2="${W - pr}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--line)" stroke-dasharray="2 4"/><text x="${pl - 6}" y="${Y(v) + 3}" text-anchor="end">${discret ? "" : (v / 1000).toLocaleString("fr-FR", { maximumFractionDigits: step < 1000 ? 1 : 0 }) + " k€"}</text>`;
   const d = points.map((p, i) => `${i ? "L" : "M"}${X(p.x).toFixed(1)},${Y(p.y).toFixed(1)}`).join("");
   const area = `${d}L${X(t1)},${H - pb}L${X(t0)},${H - pb}Z`;
   const fmt = (t) => new Date(t).toLocaleDateString("fr-FR", { month: "short", year: "2-digit" });
@@ -425,7 +436,7 @@ function viewSynthese(P) {
   <section class="hero">
     <div class="eyebrow">Patrimoine net</div>
     <div class="big">${fE(P.net)}</div>
-    ${first && netSnaps.length > 1 ? `<div class="sub"><span class="chip-d ${tone(delta)}">${delta >= 0 ? "▲ +" : "▼ −"}${fE(Math.abs(delta))}</span> depuis le ${new Date(first.x).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })}</div>` : ""}
+    ${first && netSnaps.length > 1 ? `<div class="sub"><span class="chip-d ${tone(delta)}">${delta >= 0 ? "▲ +" : "▼ −"}${discret && first.y ? fP(Math.abs(delta / first.y) * 100, 1) : fE(Math.abs(delta))}</span> depuis le ${new Date(first.x).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })}</div>` : ""}
     ${spark(netSnaps.map((s) => s.assets - s.debts))}
   </section>
   <div class="grid2 grid4">
@@ -576,7 +587,7 @@ function holdingRows(list, showAccount) {
   return list.map((h) => {
     const v = h.qty * h.price, g = h.qty * (h.price - h.pru), gp = h.pru ? ((h.price - h.pru) / h.pru) * 100 : 0;
     return `<button class="row" data-act="edit-holding" data-id="${h.id}"><span><div class="name">${esc(h.name)}</div>
-      <div class="meta">${showAccount ? esc(h.accName) + " · " : ""}${h.qty.toLocaleString("fr-FR", { maximumFractionDigits: 6 })} × ${fE2(h.price)} · PRU ${fE2(h.pru)}</div></span>
+      <div class="meta">${showAccount ? esc(h.accName) + " · " : ""}${fQ(h.qty)} × ${fU(h.price)} · PRU ${fU(h.pru)}</div></span>
       <span class="amt">${fE(v)}<small class="${tone(g)}">${g >= 0 ? "+" : "−"}${fE(Math.abs(g))} · ${fP(gp, 1)}</small></span></button>`;
   }).join("");
 }
@@ -646,7 +657,7 @@ function viewPositions(P) {
       const where = [...new Set(g.lines.map((l) => l.accName))].join(", ");
       const target = g.lines.length === 1 ? `data-act="edit-holding" data-id="${g.lines[0].id}"` : `data-act="open-account" data-id="${g.lines[0].accountId}"`;
       return `<button class="row" ${target}><span><div class="name">${posSort === "perf" ? `<span class="note" style="display:inline-block;min-width:1.6em">${i + 1}.</span>` : ""}${esc(g.name)}${g.ticker ? ` <span class="pill">${esc(g.ticker)}</span>` : ""}</div>
-        <div class="meta">${esc(where)} · ${g.qty.toLocaleString("fr-FR", { maximumFractionDigits: 6 })} · PRU ${fE2(pru)}</div>
+        <div class="meta">${esc(where)} · ${fQ(g.qty)} · PRU ${fU(pru)}</div>
         <div class="bar" style="margin-top:6px;max-width:160px"><i style="width:${w.toFixed(1)}%"></i></div></span>
         ${posSort === "perf"
           ? `<span class="amt"><span class="${tone(g.value - g.cost)}">${g.cost < g.value * 0.01 ? "offerte" : (gp > 0 ? "+" : "") + fP(gp, 1)}</span><small class="${tone(g.value - g.cost)}">${g.value >= g.cost ? "+" : "−"}${fE(Math.abs(g.value - g.cost))}</small><small class="note">${fE(g.value)} · ${fP(w, 1)}</small></span></button>`
@@ -698,7 +709,7 @@ function sheetAccount(a) {
     <div class="panel list">${a.hs.map((h) => {
       const v = h.qty * h.price, g = h.qty * (h.price - h.pru), gp = h.pru ? ((h.price - h.pru) / h.pru) * 100 : 0;
       return `<button class="row" data-act="edit-holding" data-id="${h.id}"><span><div class="name">${esc(h.name)}</div>
-        <div class="meta">${h.qty.toLocaleString("fr-FR", { maximumFractionDigits: 6 })} × ${fE2(h.price)} · PRU ${fE2(h.pru)}</div></span>
+        <div class="meta">${fQ(h.qty)} × ${fU(h.price)} · PRU ${fU(h.pru)}</div></span>
         <span class="amt">${fE(v)}<small class="${tone(g)}">${g >= 0 ? "+" : "−"}${fE(Math.abs(g))} · ${fP(gp, 1)}</small></span></button>`;
     }).join("") || `<div class="empty">Aucune position.</div>`}</div></section>` : ""}
   ${invest ? (() => { const fl = S.flows.filter((f) => f.accountId === a.id).sort((x, y) => y.date.localeCompare(x.date)); return `<section class="section"><div class="section-head"><h2>Versements</h2><button class="btn ghost" data-act="new-flow" data-id="${a.id}">Ajouter</button></div>
@@ -901,6 +912,13 @@ async function snapshotToday() {
 }
 
 /* ---------------- Rendu ---------------- */
+function eyeIcon() {
+  const b = document.getElementById("eye"); if (!b) return;
+  b.setAttribute("aria-pressed", String(discret));
+  const t = discret ? "Afficher les montants" : "Masquer les montants"; b.title = t; b.setAttribute("aria-label", t);
+  b.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z"/><circle cx="12" cy="12" r="3"/>${discret ? '<path d="M4 4l16 16"/>' : ""}</svg>`;
+}
+setTimeout(eyeIcon, 0);
 const $ = (s) => document.querySelector(s);
 function render() {
   const P = portfolio();
@@ -935,6 +953,7 @@ function setTab(t) {
 
 document.addEventListener("click", async (e) => {
   const sb = e.target.closest("[data-env]"); if (sb) { env = sb.dataset.env; return render(); }
+  if (e.target.closest("#eye")) { discret = !discret; try { localStorage.setItem("socle-discret", discret ? "1" : "0"); } catch { } eyeIcon(); return render(); }
   const ps = e.target.closest("[data-possort]"); if (ps) { posSort = ps.dataset.possort; return render(); }
   const rg = e.target.closest("[data-range]"); if (rg) { histRange = rg.dataset.range; return render(); }
   const se = e.target.closest("[data-series]"); if (se) { histSeries = se.dataset.series; return render(); }
