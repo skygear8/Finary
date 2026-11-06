@@ -366,6 +366,7 @@ function viewSynthese(P) {
     ${tile("Cash-flow locatif", fE(cf) + "<small style='font-size:12px;font-weight:500'> /mois</small>", rental.length ? "Loyers " + fE(rental.reduce((s, p) => s + p.m.rent, 0)) + " / an" : "Aucun bien locatif", rental.length ? tone(cf) : "")}
     ${tile("Plus-values latentes", fE(P.accRows.reduce((s, a) => s + a.hs.reduce((t, h) => t + h.qty * (h.price - h.pru), 0), 0)), "Bourse et crypto", tone(P.accRows.reduce((s, a) => s + a.hs.reduce((t, h) => t + h.qty * (h.price - h.pru), 0), 0)))}
   </div>
+  ${ytdTable(P)}
   ${costTable(P)}
   <div class="section"><div class="panel monthly"><span><b>Mise à jour du mois</b><div class="note">${lastUpdateText()}</div></span><button class="btn" data-act="monthly">Mettre à jour</button></div></div>
   <section class="section">
@@ -388,8 +389,9 @@ function viewSynthese(P) {
 function costTable(P) {
   const rows = [];
   for (const a of P.accRows.filter((a) => isInvestType(a.type) && a.value > 0).sort((x, y) => y.value - x.value)) {
-    const cost = (a.cash || 0) + a.hs.reduce((s, h) => s + h.qty * h.pru, 0);
-    rows.push({ name: a.name, sub: ACCOUNT_TYPES[a.type], cost, value: a.value, act: `data-act="open-account" data-id="${a.id}"` });
+    const dep = a.deposits != null;
+    const cost = dep ? a.deposits - (a.withdrawals || 0) : (a.cash || 0) + a.hs.reduce((s, h) => s + h.qty * h.pru, 0);
+    rows.push({ base: dep ? a.deposits : null, name: a.name, sub: dep ? `versé ${fE(a.deposits)}${a.withdrawals ? ", retiré " + fE(a.withdrawals) : ""}` : ACCOUNT_TYPES[a.type], cost, value: a.value, act: `data-act="open-account" data-id="${a.id}"` });
   }
   for (const p of P.propRows) {
     const m = p.m, share = (p.share ?? 100) / 100;
@@ -403,9 +405,31 @@ function costTable(P) {
   const pct = (v, c) => (c ? `${v >= c ? "+" : ""}${fP(((v - c) / c) * 100, 1)}` : "");
   return `<section class="section"><div class="section-head"><h2>Acheté ou investi, face à la valeur</h2><span class="note">plus-value</span></div>
     <div class="panel list">${rows.map((r) => `<button class="row" ${r.act}><span><div class="name">${esc(r.name)}</div><div class="meta">${esc(r.sub)} · mis ${fE(r.cost)}</div></span>
-      <span class="amt">${fE(r.value)}<small class="${tone(r.value - r.cost)}">${sg(r.value - r.cost)}${r.cost !== r.value ? " · " + pct(r.value, r.cost) : ""}</small></span></button>`).join("")}
+      <span class="amt">${fE(r.value)}<small class="${tone(r.value - r.cost)}">${sg(r.value - r.cost)}${r.cost !== r.value ? " · " + (r.base ? `${r.value - r.cost >= 0 ? "+" : ""}${fP(((r.value - r.cost) / r.base) * 100, 1)} du versé` : pct(r.value, r.cost)) : ""}</small></span></button>`).join("")}
       <div class="row"><span><div class="name"><b>Total</b></div><div class="meta">mis ${fE(tc)}</div></span><span class="amt"><b>${fE(tv)}</b><small class="${tone(tv - tc)}">${sg(tv - tc)} · ${pct(tv, tc)}</small></span></div>
-    </div><p class="note" style="margin-top:6px">Placements : PRU × quantité, plus les liquidités du compte. Le bien en SCI compte ton apport face à ta part (valeur moins crédit, plus ton apport).</p></section>`;
+    </div><p class="note" style="margin-top:6px">Placements : versements moins retraits quand on les connaît, sinon PRU × quantité plus les liquidités du compte. Le bien en SCI compte ton apport face à ta part (valeur moins crédit, plus ton apport).</p></section>`;
+}
+// performance depuis une valeur de départ connue (31/12), hors versements et retraits ; % rapporté au capital engagé (départ + versements)
+function accountPerf(a) {
+  if (a.startValue == null || !a.startDate) return null;
+  const fl = S.flows.filter((f) => f.accountId === a.id && f.date > a.startDate);
+  const net = fl.reduce((s, f) => s + (Number(f.amount) || 0), 0);
+  const gain = a.value - a.startValue - net, base = a.startValue + fl.reduce((s, f) => s + Math.max(0, Number(f.amount) || 0), 0);
+  return { gain, net, start: a.startValue, pct: base > 0 ? (gain / base) * 100 : null };
+}
+function ytdTable(P) {
+  const rows = P.accRows.filter((a) => isInvestType(a.type)).map((a) => ({ a, r: accountPerf(a) })).filter((x) => x.r);
+  if (!rows.length) return "";
+  const missing = P.accRows.filter((a) => isInvestType(a.type) && a.value > 0 && a.startValue == null);
+  const g = rows.reduce((s, x) => s + x.r.gain, 0);
+  const start = rows.reduce((s, x) => s + x.r.start, 0), net = rows.reduce((s, x) => s + x.r.net, 0);
+  const year = new Date(rows[0].a.startDate).getFullYear() + 1;
+  return `<section class="section"><div class="section-head"><h2>Performance ${year} des placements</h2><span class="note">hors versements</span></div>
+    <div class="panel list">${rows.map(({ a, r }) => `<button class="row" data-act="open-account" data-id="${a.id}"><span><div class="name">${esc(a.name)}</div>
+      <div class="meta">31/12 : ${fE(r.start)} · ${r.net >= 0 ? "versé" : "retiré"} ${fE(Math.abs(r.net))} · aujourd'hui ${fE(a.value)}</div></span>
+      <span class="amt"><span class="${tone(r.gain)}">${sg(r.gain)}</span>${r.pct != null ? `<small class="${tone(r.gain)}">${r.pct >= 0 ? "+" : ""}${fP(r.pct, 1)}</small>` : ""}</span></button>`).join("")}
+      <div class="row"><span><div class="name"><b>Total</b></div><div class="meta">départ ${fE(start)} · flux nets ${sg(net)}</div></span><span class="amt"><b class="${tone(g)}">${sg(g)}</b></span></div>
+    </div>${missing.length ? `<p class="note" style="margin-top:6px">Sans valeur au 31/12 : ${missing.map((a) => esc(a.name)).join(", ")}.</p>` : ""}</section>`;
 }
 const sg = (v) => (v >= 0 ? "+" : "−") + fE(Math.abs(v));
 // variation du net entre une photo et aujourd'hui, séparée entre marchés et épargne
@@ -560,7 +584,7 @@ function sheetAccount(a) {
   const invest = !["courant", "livret"].includes(a.type);
   return `
   <div class="sheet-head"><div><h2>${esc(a.name)}</h2><div class="note">${ACCOUNT_TYPES[a.type]}${a.institution ? " · " + esc(a.institution) : ""}</div></div><button class="x" data-act="close" aria-label="Fermer">×</button></div>
-  <div class="grid2">${tile("Valeur", fE(a.value))}${tile("Liquidités", fE(a.cash))}${invest && a.hs.length ? tile("Investi (PRU)", fE(inv)) + tile("Plus-value latente", fE(pnl), inv ? fP((pnl / inv) * 100) : "", tone(pnl)) : ""}</div>
+  <div class="grid2">${tile("Valeur", fE(a.value))}${tile("Liquidités", fE(a.cash))}${invest && a.hs.length ? tile("Investi (PRU)", fE(inv)) + tile("Plus-value latente", fE(pnl), inv ? fP((pnl / inv) * 100) : "", tone(pnl)) : ""}${(() => { const r = accountPerf(a); return r ? tile("Depuis le 31/12", sg(r.gain), r.pct != null ? (r.pct >= 0 ? "+" : "") + fP(r.pct, 1) + " hors versements" : "", tone(r.gain)) : ""; })()}</div>
   ${invest ? `<section class="section"><div class="section-head"><h2>Positions</h2><button class="btn ghost" data-act="new-holding" data-id="${a.id}">Ajouter</button></div>
     <div class="panel list">${a.hs.map((h) => {
       const v = h.qty * h.price, g = h.qty * (h.price - h.pru), gp = h.pru ? ((h.price - h.pru) / h.pru) * 100 : 0;
@@ -689,7 +713,8 @@ function sheetMonthly() {
 const F = {
   account: { title: "Compte", col: "accounts", groups: [[null, [
     ["name", "Nom", "text", { full: 1, req: 1, ph: "PEA, Livret A…" }], ["type", "Type", ACCOUNT_TYPES], ["institution", "Établissement", "text"],
-    ["cash", "Liquidités ou solde (€)", "number", { full: 1 }]]]] },
+    ["cash", "Liquidités ou solde (€)", "number", { full: 1 }]]], ["Historique (facultatif)", [
+    ["startValue", "Valeur au 31/12 de l'an dernier (€)", "number", { full: 1 }], ["deposits", "Total versé depuis l'ouverture (€)", "number"], ["withdrawals", "Total retiré (€)", "number"]]]] },
   holding: { title: "Position", col: "holdings", groups: [[null, [
     ["name", "Nom", "text", { full: 1, req: 1, ph: "ETF MSCI World" }], ["ticker", "Ticker ou ISIN", "text"], ["cls", "Classe", ASSET_CLASSES],
     ["qty", "Quantité", "number", { req: 1 }], ["pru", "PRU (€)", "number", { req: 1 }], ["price", "Cours actuel (€)", "number", { full: 1 }]]]] },
@@ -733,6 +758,10 @@ function readForm(form) {
     o[k] = type === "number" ? num(v) : String(v ?? "").trim();
   }
   if (kind === "property") { if (!o.value) o.value = o.price; if (!fd.get("share")) o.share = 100; }
+  if (kind === "account") {
+    for (const k of ["startValue", "deposits", "withdrawals"]) if (!String(fd.get(k) ?? "").trim()) o[k] = null;
+    if (o.startValue != null) o.startDate = `${new Date().getFullYear() - 1}-12-31`;
+  }
   if (kind === "holding" && !o.price) o.price = o.pru;
   if (kind === "loan") { o.months = Math.round(o.years * 12); delete o.years; }
   return o;
