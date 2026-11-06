@@ -534,7 +534,15 @@ function sheetProperty(p) {
     ${p.kind ? `<div><span>Type</span><span>${esc(p.kind)}</span></div>` : ""}
     ${p.surface ? `<div><span>Surface</span><span>${p.surface} m²</span></div>` : ""}
     ${p.holder ? `<div><span>Détenu via</span><span>${esc(p.holder)}${(p.share ?? 100) < 100 ? ` · ta part ${p.share} %` : ""}</span></div>` : ""}
+    ${p.dpe ? `<div><span>DPE</span><span>${esc(p.dpe)}</span></div>` : ""}
+    ${p.cadastre ? `<div><span>Cadastre</span><span>${esc(p.cadastre)}</span></div>` : ""}
     ${p.notes ? `<div style="display:block"><span class="note">${esc(p.notes)}</span></div>` : ""}
+  </div></section>` : ""}
+  ${Array.isArray(p.lots) && p.lots.length ? `<section class="section"><div class="section-head"><h2>Lots</h2><span class="note">loyer prévu HC · marché</span></div><div class="panel list">
+    ${p.lots.map((l) => `<div class="row"><span><div class="name">${esc(l.name)}${l.type ? ` <span class="pill">${esc(l.type)}</span>` : ""}</div>
+      <div class="meta">${l.surface ? l.surface.toLocaleString("fr-FR") + " m²" : ""}${l.status ? " · " + esc(l.status) : ""}</div></span>
+      <span class="amt">${l.rent ? fE(l.rent) : "—"}<small class="note">${l.charges ? "+ " + fE(l.charges) + " charges" : ""}</small>${l.market ? `<small class="note">marché ${fE(l.market)}</small>` : ""}</span></div>`).join("")}
+    <div class="row"><span><div class="name">Total</div></span><span class="amt">${fE(p.lots.reduce((a, l) => a + (l.rent || 0), 0))}<small class="note">par mois HC</small></span></div>
   </div></section>` : ""}
   ${m.apport ? `<section class="section"><h2>Ton apport</h2><div class="panel kv">
     ${p.capital ? `<div><span>Capital social</span><span>${fE(p.capital)}</span></div>` : ""}
