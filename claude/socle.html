@@ -366,6 +366,7 @@ function viewSynthese(P) {
     ${tile("Cash-flow locatif", fE(cf) + "<small style='font-size:12px;font-weight:500'> /mois</small>", rental.length ? "Loyers " + fE(rental.reduce((s, p) => s + p.m.rent, 0)) + " / an" : "Aucun bien locatif", rental.length ? tone(cf) : "")}
     ${tile("Plus-values latentes", fE(P.accRows.reduce((s, a) => s + a.hs.reduce((t, h) => t + h.qty * (h.price - h.pru), 0), 0)), "Bourse et crypto", tone(P.accRows.reduce((s, a) => s + a.hs.reduce((t, h) => t + h.qty * (h.price - h.pru), 0), 0)))}
   </div>
+  ${costTable(P)}
   <div class="section"><div class="panel monthly"><span><b>Mise à jour du mois</b><div class="note">${lastUpdateText()}</div></span><button class="btn" data-act="monthly">Mettre à jour</button></div></div>
   <section class="section">
     <h2>Répartition</h2>
@@ -382,6 +383,29 @@ function viewSynthese(P) {
       <div><span class="note">Versements notés sur tes placements : ${fE(dec.flows)}. La performance = variation des placements moins ces versements.</span></div>
     </div>` : ""}
   </section>`;
+}
+// ce que tu as mis (prix d'achat, PRU, apport) face à ce que ça vaut aujourd'hui
+function costTable(P) {
+  const rows = [];
+  for (const a of P.accRows.filter((a) => isInvestType(a.type) && a.value > 0).sort((x, y) => y.value - x.value)) {
+    const cost = (a.cash || 0) + a.hs.reduce((s, h) => s + h.qty * h.pru, 0);
+    rows.push({ name: a.name, sub: ACCOUNT_TYPES[a.type], cost, value: a.value, act: `data-act="open-account" data-id="${a.id}"` });
+  }
+  for (const p of P.propRows) {
+    const m = p.m, share = (p.share ?? 100) / 100;
+    if (m.apport) rows.push({ name: p.name, sub: "ton apport", cost: m.apport, value: m.apport + m.gain, act: `data-act="open-property" data-id="${p.id}"` });
+    else rows.push({ name: p.name, sub: "prix + frais + travaux", cost: m.cost * share, value: m.value, act: `data-act="open-property" data-id="${p.id}"` });
+  }
+  const liq = P.accRows.filter((a) => !isInvestType(a.type)).reduce((s, a) => s + a.value, 0);
+  if (liq) rows.push({ name: "Liquidités", sub: "comptes courants et livrets", cost: liq, value: liq, act: `data-tab="comptes"` });
+  if (!rows.length) return "";
+  const tc = rows.reduce((s, r) => s + r.cost, 0), tv = rows.reduce((s, r) => s + r.value, 0);
+  const pct = (v, c) => (c ? `${v >= c ? "+" : ""}${fP(((v - c) / c) * 100, 1)}` : "");
+  return `<section class="section"><div class="section-head"><h2>Acheté ou investi, face à la valeur</h2><span class="note">plus-value</span></div>
+    <div class="panel list">${rows.map((r) => `<button class="row" ${r.act}><span><div class="name">${esc(r.name)}</div><div class="meta">${esc(r.sub)} · mis ${fE(r.cost)}</div></span>
+      <span class="amt">${fE(r.value)}<small class="${tone(r.value - r.cost)}">${sg(r.value - r.cost)}${r.cost !== r.value ? " · " + pct(r.value, r.cost) : ""}</small></span></button>`).join("")}
+      <div class="row"><span><div class="name"><b>Total</b></div><div class="meta">mis ${fE(tc)}</div></span><span class="amt"><b>${fE(tv)}</b><small class="${tone(tv - tc)}">${sg(tv - tc)} · ${pct(tv, tc)}</small></span></div>
+    </div><p class="note" style="margin-top:6px">Placements : PRU × quantité, plus les liquidités du compte. Le bien en SCI compte ton apport face à ta part (valeur moins crédit, plus ton apport).</p></section>`;
 }
 const sg = (v) => (v >= 0 ? "+" : "−") + fE(Math.abs(v));
 // variation du net entre une photo et aujourd'hui, séparée entre marchés et épargne
