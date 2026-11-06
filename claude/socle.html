@@ -225,6 +225,12 @@ details.fold > .section-head { margin-top: 6px; }
 .tab[aria-current="page"] { background: color-mix(in srgb, var(--accent) 12%, transparent); }
 .wrap { padding-bottom: calc(110px + env(safe-area-inset-bottom, 0px)); }
 .brand b svg { width: 18px; height: 18px; }
+.profiles { display: flex; gap: 6px; margin-top: 14px; padding: 4px; background: var(--sunk); border-radius: 16px; }
+.prof { appearance: none; flex: 1 1 0; min-width: 0; border: 0; background: none; color: var(--muted); font: 600 13px var(--font-body); padding: 8px 6px; border-radius: 12px; display: flex; align-items: center; justify-content: center; gap: 7px; cursor: pointer; white-space: nowrap; }
+.prof .av-s { width: 22px; height: 22px; border-radius: 8px; display: grid; place-items: center; font: 700 11px var(--font-display); background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--accent); flex: none; }
+.prof[aria-selected="true"] { background: var(--surface); color: var(--fg); box-shadow: var(--shadow); }
+.prof[aria-selected="true"] .av-s { background: var(--gold); color: #fff; }
+.prof:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .head-r { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .head-r .status { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .eye { appearance: none; flex: none; width: 36px; height: 36px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface); color: var(--fg); display: grid; place-items: center; cursor: pointer; box-shadow: var(--shadow); }
@@ -245,6 +251,7 @@ details.fold > .section-head { margin-top: 6px; }
     <b><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5 15 14.5H1z" fill="var(--gold)"/></svg>Socle</b>
     <span class="head-r"><span class="status" id="status">Chargement…</span><button class="eye" id="eye" type="button" aria-pressed="false" aria-label="Masquer les montants" title="Masquer les montants"></button></span>
   </header>
+  <div class="profiles" id="profiles" role="tablist" aria-label="Profil"></div>
   <main id="view"></main>
 </div>
 
@@ -355,6 +362,24 @@ function propertyMetrics(p, loans) {
 /* ---------------- État ---------------- */
 const S = { accounts: [], holdings: [], properties: [], loans: [], snapshots: [], flows: [], ready: false, writable: true };
 const COLS = ["accounts", "holdings", "properties", "loans", "snapshots", "flows"];
+// profils : chaque compte / bien porte `profile` (absent = nathan). R garde tout, S ne montre que le profil choisi.
+const PROFILES = [{ k: "nathan", label: "Nathan" }, { k: "angelique", label: "Angélique" }, { k: "foyer", label: "Foyer" }];
+const R = { accounts: [], holdings: [], properties: [], loans: [], snapshots: [], flows: [] };
+let profile = "nathan"; try { const v = localStorage.getItem("socle-profil"); if (PROFILES.some((p) => p.k === v)) profile = v; } catch { }
+const ownerOf = (x) => x.profile || "nathan";
+const snapPrefix = (k) => (k === "nathan" ? "" : k + "_");
+function applyProfile(k = profile) {
+  const mine = (x) => k === "foyer" || ownerOf(x) === k;
+  S.accounts = R.accounts.filter(mine);
+  const ids = new Set(S.accounts.map((a) => a.id));
+  S.holdings = R.holdings.filter((h) => ids.has(h.accountId));
+  S.flows = R.flows.filter((f) => ids.has(f.accountId));
+  S.properties = R.properties.filter(mine);
+  const pids = new Set(S.properties.map((p) => p.id));
+  S.loans = R.loans.filter((l) => (l.propertyId ? pids.has(l.propertyId) : mine(l)));
+  const pre = snapPrefix(k);
+  S.snapshots = R.snapshots.filter((x) => (pre ? x.id.startsWith(pre) : /^\d{4}-\d{2}-\d{2}$/.test(x.id))).map((x) => ({ ...x, id: x.id.slice(pre.length) }));
+}
 const isInvestType = (t) => !["courant", "livret"].includes(t);
 let histRange = "all", histSeries = "net";
 let db = null, tab = "synthese", sheet = null;
@@ -893,7 +918,7 @@ function readForm(form) {
 async function save(col, id, data) {
   if (!db) throw new Error("La sauvegarde n'est pas disponible dans cette vue.");
   if (id) { const { id: _drop, ...old } = S[col].find((x) => x.id === id) || {}; await db.collection(col).doc(id).set({ ...old, ...data, updatedAt: new Date().toISOString() }); }
-  else return (await db.collection(col).add({ ...data, createdAt: new Date().toISOString() })).id;
+  else return (await db.collection(col).add({ ...data, ...(["accounts", "properties", "loans"].includes(col) && profile !== "foyer" && !data.profile ? { profile } : {}), createdAt: new Date().toISOString() })).id;
 }
 async function remove(kind, id) {
   const col = F[kind].col;
@@ -902,13 +927,20 @@ async function remove(kind, id) {
   if (kind === "property") for (const l of S.loans.filter((l) => l.propertyId === id)) await db.collection("loans").doc(l.id).delete();
 }
 let snapDone = false;
+// une photo par jour et par profil (Nathan : AAAA-MM-JJ ; autres : profil_AAAA-MM-JJ)
 async function snapshotToday() {
   if (snapDone || !db || !S.ready || !S.writable) return;
-  const P = portfolio(); if (!P.assets && !P.debts) return;
-  const id = new Date().toISOString().slice(0, 10), cur = S.snapshots.find((s) => s.id === id);
   snapDone = true;
-  if (cur && Math.round(cur.assets) === Math.round(P.assets) && Math.round(cur.debts) === Math.round(P.debts) && Math.round(cur.inv ?? -1) === Math.round(P.inv)) return;
-  try { await db.collection("snapshots").doc(id).set({ assets: Math.round(P.assets), debts: Math.round(P.debts), inv: Math.round(P.inv), by: "page" }); } catch { /* lecture seule */ }
+  const day = new Date().toISOString().slice(0, 10), todo = [];
+  for (const { k } of PROFILES) {
+    applyProfile(k);
+    const P = portfolio(); if (!P.assets && !P.debts) continue;
+    const id = snapPrefix(k) + day, cur = R.snapshots.find((s) => s.id === id);
+    if (cur && Math.round(cur.assets) === Math.round(P.assets) && Math.round(cur.debts) === Math.round(P.debts) && Math.round(cur.inv ?? -1) === Math.round(P.inv)) continue;
+    todo.push([id, { assets: Math.round(P.assets), debts: Math.round(P.debts), inv: Math.round(P.inv), by: "page" }]);
+  }
+  applyProfile();
+  for (const [id, d] of todo) { try { await db.collection("snapshots").doc(id).set(d); } catch { /* lecture seule */ } }
 }
 
 /* ---------------- Rendu ---------------- */
@@ -921,7 +953,10 @@ function eyeIcon() {
 setTimeout(eyeIcon, 0);
 const $ = (s) => document.querySelector(s);
 function render() {
+  applyProfile();
   const P = portfolio();
+  const pb = document.getElementById("profiles");
+  if (pb) pb.innerHTML = PROFILES.map((p) => `<button role="tab" class="prof" aria-selected="${p.k === profile}" data-profile="${p.k}"><span class="av-s">${p.k === "foyer" ? "∞" : p.label.charAt(0)}</span>${p.label}</button>`).join("");
   $("#view").innerHTML = tab === "comptes" ? viewComptes(P) : tab === "positions" ? viewPositions(P) : tab === "immobilier" ? viewImmo(P) : viewSynthese(P);
   document.querySelectorAll(".tab").forEach((t) => t.setAttribute("aria-current", t.dataset.tab === tab ? "page" : "false"));
   if (sheet && sheet.live) openSheet(sheet, true);
@@ -953,6 +988,7 @@ function setTab(t) {
 
 document.addEventListener("click", async (e) => {
   const sb = e.target.closest("[data-env]"); if (sb) { env = sb.dataset.env; return render(); }
+  const pf = e.target.closest("[data-profile]"); if (pf) { profile = pf.dataset.profile; try { localStorage.setItem("socle-profil", profile); } catch { } window.scrollTo(0, 0); return render(); }
   if (e.target.closest("#eye")) { discret = !discret; try { localStorage.setItem("socle-discret", discret ? "1" : "0"); } catch { } eyeIcon(); return render(); }
   const ps = e.target.closest("[data-possort]"); if (ps) { posSort = ps.dataset.possort; return render(); }
   const rg = e.target.closest("[data-range]"); if (rg) { histRange = rg.dataset.range; return render(); }
@@ -1046,7 +1082,7 @@ setTab(location.hash.slice(1));
   const got = new Set();
   for (const col of COLS) {
     db.collection(col).onSnapshot((snap) => {
-      S[col] = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      R[col] = snap.docs.map((d) => ({ id: d.id, ...d.data() })); applyProfile();
       if (!snap.metadata.fromCache) got.add(col);
       if (got.size === COLS.length && !S.ready) { S.ready = true; clearTimeout(timer); status.textContent = S.writable ? "Enregistré dans Claude" : "Lecture seule"; snapshotToday(); }
       render();
