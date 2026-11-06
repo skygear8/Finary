@@ -1,51 +1,37 @@
 <title>Socle</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&family=Figtree:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Manrope:wght@400;500;600;700&display=swap">
 <style>
 /* Layout : app mobile d'abord, en-tête de patrimoine net, onglets fixés en bas, fiches en feuille glissante. */
 :root {
-  --bg: #f4f3ef;
-  --surface: #ffffff;
-  --sunk: #eceae4;
-  --fg: #141b2c;
-  --muted: #67708a;
-  --line: #e7e4dd;
-  --accent: #1f3f86;
-  --gold: #b8892b;
-  --gold-hi: #e9c46a;
-  --hero: linear-gradient(150deg, #0a1633 0%, #17306b 55%, #24489a 100%);
-  --shadow: 0 1px 2px rgb(20 28 50 / 0.04), 0 8px 24px -12px rgb(20 28 50 / 0.16);
-  --panel-border: transparent;
-  --accent-ink: #ffffff;
-  --gain: #12805c;
-  --loss: #c2410c;
-  --c-liq: #8592a6;
-  --c-bourse: #1f3f86;
-  --c-av: #6d5bd0;
-  --c-crypto: #d9822b;
-  --c-immo: #c39a2f; --c-sci: #9a6b1f;
-  --c-es: #b4497e;
-  --c-autre: #a3b1ad;
-  --font-display: "Sora", ui-sans-serif, system-ui, sans-serif;
-  --font-body: "Figtree", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-  --r: 18px;
+  --bg: #f6f5f1; --surface: #ffffff; --sunk: #efede7; --fg: #15201c; --muted: #6b7570; --line: #e6e3dc;
+  --accent: #1d4a3a; --accent-ink: #ffffff; --gold: #b07a3a; --gold-hi: #c99a5b;
+  --hero: radial-gradient(120% 90% at 100% 0%, #e4efe8 0%, transparent 60%), #ffffff;
+  --shadow: 0 1px 2px rgb(21 32 28 / 0.04), 0 10px 30px -18px rgb(21 32 28 / 0.18); --panel-border: transparent;
+  --gain: #1d7a55; --loss: #b5452a;
+  --c-liq: #9aa59f; --c-bourse: #1d4a3a; --c-av: #5d7fa3; --c-crypto: #c98a3c; --c-immo: #b6956a; --c-sci: #8a6a45; --c-es: #a3627e; --c-autre: #c4c9c3;
+  --font-display: "Fraunces", ui-serif, Georgia, serif;
+  --font-body: "Manrope", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --r: 20px;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #0a0e17; --surface: #121826; --sunk: #1a2132; --fg: #e8ecf4; --muted: #98a2b6; --line: #232c3e;
-    --hero: linear-gradient(150deg, #070f24 0%, #132a5e 58%, #1e3f86 100%); --gold: #e2bc5c; --gold-hi: #f0d488; --shadow: none; --panel-border: #1f2738;
-    --accent: #8fb0ff; --accent-ink: #0a1633; --gain: #4ade9b; --loss: #fb8b4b;
-    --c-liq: #98a5ba; --c-bourse: #8fb0ff; --c-av: #a395f2; --c-crypto: #f0a35a; --c-immo: #e2bc5c; --c-sci: #c9944a; --c-es: #e07fb0; --c-autre: #5d6f6b;
+    --bg: #0d1210; --surface: #151c19; --sunk: #1c2521; --fg: #e9eee9; --muted: #96a29b; --line: #24302b;
+    --accent: #8fd0b0; --accent-ink: #0d1210; --gold: #d9a866; --gold-hi: #e8c08a;
+    --hero: radial-gradient(120% 90% at 100% 0%, #1d3329 0%, transparent 60%), #151c19;
+    --shadow: none; --panel-border: #212b27; --gain: #6fd4a3; --loss: #f0906e;
+    --c-liq: #8f9b95; --c-bourse: #8fd0b0; --c-av: #94b4d8; --c-crypto: #e0a65c; --c-immo: #d2b48a; --c-sci: #b8946a; --c-es: #d295b0; --c-autre: #4f5b55;
     color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
-  --bg: #0a0e17; --surface: #121826; --sunk: #1a2132; --fg: #e8ecf4; --muted: #98a2b6; --line: #232c3e;
-    --hero: linear-gradient(150deg, #070f24 0%, #132a5e 58%, #1e3f86 100%); --gold: #e2bc5c; --gold-hi: #f0d488; --shadow: none; --panel-border: #1f2738;
-  --accent: #8fb0ff; --accent-ink: #0a1633; --gain: #4ade9b; --loss: #fb8b4b;
-  --c-liq: #98a5ba; --c-bourse: #8fb0ff; --c-av: #a395f2; --c-crypto: #f0a35a; --c-immo: #e2bc5c; --c-sci: #c9944a; --c-es: #e07fb0; --c-autre: #5d6f6b;
-  color-scheme: dark;
+    --bg: #0d1210; --surface: #151c19; --sunk: #1c2521; --fg: #e9eee9; --muted: #96a29b; --line: #24302b;
+    --accent: #8fd0b0; --accent-ink: #0d1210; --gold: #d9a866; --gold-hi: #e8c08a;
+    --hero: radial-gradient(120% 90% at 100% 0%, #1d3329 0%, transparent 60%), #151c19;
+    --shadow: none; --panel-border: #212b27; --gain: #6fd4a3; --loss: #f0906e;
+    --c-liq: #8f9b95; --c-bourse: #8fd0b0; --c-av: #94b4d8; --c-crypto: #e0a65c; --c-immo: #d2b48a; --c-sci: #b8946a; --c-es: #d295b0; --c-autre: #4f5b55;
+    color-scheme: dark;
 }
 * { box-sizing: border-box; }
 body {
@@ -308,6 +294,52 @@ label.chk input { width: auto; margin-top: 2px; }
 label.rng { display: grid; grid-template-columns: 1fr auto; gap: 6px 10px; align-items: center; color: var(--fg); font-size: 13px; margin-bottom: 12px; }
 label.rng input { grid-column: 1 / -1; padding: 0; border: 0; background: none; accent-color: var(--accent); }
 label.rng b { font-family: var(--font-display); }
+
+/* ---- Habillage 3 : clair et posé, chiffres en serif, vert forêt ---- */
+body { font-size: 15px; letter-spacing: -0.003em; }
+h1, h2, h3 { letter-spacing: -0.015em; font-weight: 500; }
+h2 { font-size: 18px; }
+.brand b { font-weight: 600; font-size: 20px; }
+.eyebrow { letter-spacing: 0.1em; font-weight: 700; font-size: 10.5px; }
+.hero { background: var(--hero); color: var(--fg); border: 1px solid var(--line); border-radius: 28px; box-shadow: var(--shadow); padding: 24px 22px 0; }
+.hero::before { display: none; }
+.hero::after { display: none; }
+.hero .eyebrow, .hero .sub { color: var(--muted); }
+.hero .big { color: var(--fg); font-weight: 400; letter-spacing: -0.025em; font-size: clamp(38px, 10vw, 52px); font-variation-settings: "opsz" 144; }
+.hero .sub .gain { color: var(--gain); } .hero .sub .loss { color: var(--loss); }
+.chip-d { background: color-mix(in srgb, var(--accent) 11%, transparent); color: var(--accent) !important; }
+.spark { margin: 8px -22px 0; width: calc(100% + 44px); height: 64px; }
+.mbtn { background: var(--sunk); color: var(--fg); }
+.tile { border: 1px solid var(--line); box-shadow: none; border-radius: 18px; }
+.tile .v { font-weight: 500; font-size: 22px; letter-spacing: -0.02em; }
+.panel, details.fold { border: 1px solid var(--line); box-shadow: none; border-radius: 22px; }
+details.fold .panel { border-color: var(--line); }
+details.fold > summary b { font-weight: 500; font-size: 17px; }
+.fold-t h2, details.fold .fold-t h2 { font-family: var(--font-body); font-weight: 700; font-size: 14.5px; letter-spacing: 0; }
+.bar { height: 5px; }
+.bar > i { background: var(--accent); }
+.goal .bar { height: 6px; }
+.mbars i { background: color-mix(in srgb, var(--accent) 75%, transparent); border-radius: 5px 5px 2px 2px; }
+.btn { border-radius: 99px; font-weight: 700; }
+.btn.ghost { background: transparent; border: 1px solid var(--line); }
+.seg-b { border-color: var(--line); }
+.seg-b[aria-selected="true"] { background: var(--fg); border-color: var(--fg); color: var(--bg); }
+.profiles { background: transparent; border: 1px solid var(--line); border-radius: 99px; }
+.prof { border-radius: 99px; }
+.prof[aria-selected="true"] { background: var(--fg); color: var(--bg); box-shadow: none; }
+.prof[aria-selected="true"] .av-s { background: color-mix(in srgb, var(--bg) 18%, transparent); color: var(--bg); }
+.tab[aria-current="page"] { background: var(--fg); color: var(--bg); }
+.tab[aria-current="page"] svg { color: var(--bg); }
+.tabs { border-radius: 99px; padding: 5px; }
+.tab { border-radius: 99px; }
+.av { border-radius: 99px; font-weight: 500; }
+.row .amt { font-weight: 700; }
+.eye { border-radius: 99px; box-shadow: none; }
+.eye[aria-pressed="true"] { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+.cal-d.has { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.cal-day { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.warn { color: var(--gold); }
+.sheet { border-radius: 26px 26px 0 0; }
 </style>
 
 <div class="wrap">
@@ -492,7 +524,7 @@ function spark(ys) {
   const W = 300, H = 46, min = Math.min(...ys), max = Math.max(...ys), r = max - min || 1;
   const pts = ys.map((y, i) => [(i / (ys.length - 1)) * W, 4 + (1 - (y - min) / r) * (H - 8)]);
   const d = pts.map((p, i) => `${i ? "L" : "M"}${p[0].toFixed(1)},${p[1].toFixed(1)}`).join("");
-  return `<svg class="spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true"><path d="${d}L${W},${H}L0,${H}Z" fill="url(#sg)"/><defs><linearGradient id="sg" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#e9c46a" stop-opacity=".3"/><stop offset="1" stop-color="#e9c46a" stop-opacity="0"/></linearGradient></defs><path d="${d}" fill="none" stroke="#e9c46a" stroke-width="2" vector-effect="non-scaling-stroke" stroke-linejoin="round"/></svg>`;
+  return `<svg class="spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true"><path d="${d}L${W},${H}L0,${H}Z" fill="url(#sg)"/><defs><linearGradient id="sg" x1="0" x2="0" y1="0" y2="1"><stop offset="0" style="stop-color:var(--accent)" stop-opacity=".18"/><stop offset="1" style="stop-color:var(--accent)" stop-opacity="0"/></linearGradient></defs><path d="${d}" fill="none" style="stroke:var(--accent)" stroke-width="2" vector-effect="non-scaling-stroke" stroke-linejoin="round"/></svg>`;
 }
 function lineChart(points, label) {
   if (points.length < 2) return `<p class="note">La courbe se construit toute seule : une photo de ton patrimoine net est enregistrée chaque jour où tu ouvres Socle.</p>`;
@@ -1319,13 +1351,20 @@ function recurringSection(D) {
     <p class="note">Dates déduites du dernier prélèvement. Pour retirer un paiement de la liste ou le marquer annuel, ouvre-le et coche l'option.</p></details>`;
 }
 // épargne nette mensuelle moyenne (budget) : base des objectifs et de la projection
+// dépenses d'une personne = ses comptes perso + ce qu'elle verse sur le compte joint (sa part du joint) ; Foyer = tout, joint compris
 function avgSaving() {
   const keep = bScope; bScope = "all"; const D = budgetData(); bScope = keep;
-  const now = new Date().toISOString().slice(0, 7);
-  const months = [...new Set(D.tx.map((t) => ym(t.date)))].filter((m) => m < now).sort().slice(-3);
+  const now = new Date().toISOString().slice(0, 7), solo = profile === "nathan" || profile === "angelique";
+  const own = solo ? D.tx.filter((t) => t.accountId !== "joint") : D.tx;
+  const months = [...new Set(own.map((t) => ym(t.date)))].filter((m) => m < now).sort().slice(-3);
   if (!months.length) return null;
-  const s = months.map((m) => monthTotals(D.tx.filter((t) => ym(t.date) === m)));
-  return { save: s.reduce((a, x) => a + x.save, 0) / s.length, rest: s.reduce((a, x) => a + x.rest, 0) / s.length, out: s.reduce((a, x) => a + x.out, 0) / s.length, n: months.length };
+  const s = months.map((m) => {
+    const T = monthTotals(own.filter((t) => ym(t.date) === m));
+    if (!solo) return T;
+    const c = D.tx.filter((t) => t.accountId === "joint" && ym(t.date) === m && t.amount > 0 && t.c === "interne" && whoOf(t) === profile).reduce((x, t) => x + t.amount, 0);
+    return { ...T, out: T.out + c, rest: T.rest - c, joint: c };
+  });
+  return { save: s.reduce((a, x) => a + x.save, 0) / s.length, rest: s.reduce((a, x) => a + x.rest, 0) / s.length, out: s.reduce((a, x) => a + x.out, 0) / s.length, joint: solo ? s.reduce((a, x) => a + x.joint, 0) / s.length : null, n: months.length };
 }
 // objectifs : collection goals {profile, name, target, accounts[], date?}
 function goalsSection(P) {
@@ -1728,7 +1767,7 @@ function fireSection(P) {
       <div class="strong"><span>Au rythme actuel (${fE(base)}/mois)</span><span>${when(y0)}</span></div>
       <div><span>Avec 200 €/mois de plus</span><span class="gain">${when(y1)}</span></div>
       <div><span><label for="fire-birth">Ton année de naissance</label></span><span><input id="fire-birth" class="inl" inputmode="numeric" value="${birth || ""}" placeholder="ex. 1995" ${S.writable ? "" : "disabled"}></span></div></div>
-    <p class="note" style="margin-top:6px">Règle des 4 % : un capital de 25 fois tes dépenses annuelles permet d'en retirer 4 % par an sans l'épuiser sur 30 ans. Rendement réel supposé : 3 %/an (5 % moins 2 % d'inflation), montants en euros d'aujourd'hui. Les dépenses comptent tout le compte joint.</p></details>`;
+    <p class="note" style="margin-top:6px">Règle des 4 % : un capital de 25 fois tes dépenses annuelles permet d'en retirer 4 % par an sans l'épuiser sur 30 ans. Rendement réel supposé : 3 %/an (5 % moins 2 % d'inflation), montants en euros d'aujourd'hui. Pour Nathan ou Angélique, les dépenses = comptes perso + versements sur le compte joint ; pour le Foyer, tout le joint.</p></details>`;
 }
 document.addEventListener("change", async (e) => {
   if (e.target.id !== "fire-birth") return;
@@ -2092,7 +2131,7 @@ function healthCalc(P) {
   ];
   const score = Math.round(parts.reduce((s, p) => s + p.pts, 0));
   const worst = [...parts].sort((a, b) => a.pts / a.max - b.pts / b.max)[0];
-  return { score, parts, worst, months, liq, out: av.out };
+  return { score, parts, worst, months, liq, out: av.out, joint: av.joint };
 }
 function healthSection(P) {
   if (profile === "sci") return "";
@@ -2101,7 +2140,7 @@ function healthSection(P) {
   return `<details class="section fold" data-fold="health" ${openFolds.has("health") ? "open" : ""}><summary><span class="fold-t"><h2>Santé financière</h2><span class="note">épargne de précaution : <b class="${h.months >= 6 ? "gain" : h.months >= 3 ? "warn" : "loss"}">${String(Math.round(h.months * 10) / 10).replace(".", ",")} mois</b></span></span><b style="color:${col}">${h.score}<small>/100</small></b></summary>
     <div class="panel kv">${h.parts.map((p) => `<div><span>${p.k}<small class="note"> · ${p.v}</small><span class="bar" style="display:block;margin-top:5px"><i style="width:${((p.pts / p.max) * 100).toFixed(0)}%;background:${p.pts / p.max >= 0.75 ? "var(--gain)" : p.pts / p.max >= 0.4 ? "#d9822b" : "var(--loss)"}"></i></span></span><span>${Math.round(p.pts)}/${p.max}</span></div>`).join("")}
       <div class="strong"><span>Le levier le plus utile : ${h.worst.k.toLowerCase()}</span><span></span></div><div><span class="note">${h.worst.tip}</span></div></div>
-    <p class="note" style="margin-top:6px">Épargne de précaution = comptes courants et livrets (${fE(h.liq)}) divisés par tes dépenses moyennes (${fE(h.out)}/mois). Vert à partir de 6 mois, orange entre 3 et 6, rouge en dessous.</p></details>`;
+    <p class="note" style="margin-top:6px">Épargne de précaution = comptes courants et livrets (${fE(h.liq)}) divisés par tes dépenses moyennes (${fE(h.out)}/mois${h.joint != null ? `, dont ${fE(h.joint)} versés sur le compte joint` : ""}). Vert à partir de 6 mois, orange entre 3 et 6, rouge en dessous.</p></details>`;
 }
 
 // ---- simulateur d'achat ----
