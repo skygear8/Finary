@@ -378,6 +378,7 @@ const ENVELOPES = [
 ];
 const ALWAYS = ["all", "cto", "pea", "assurance_vie", "courant", "livret"];
 let env = "all";
+let posSort = "perf";
 
 function accountRow(a) {
   const pnl = a.hs.reduce((s, h) => s + h.qty * (h.price - h.pru), 0);
@@ -441,7 +442,8 @@ function viewPositions(P) {
     g.qty += h.qty; g.cost += h.qty * h.pru; g.value += h.qty * h.price; g.lines.push(h);
     map.set(key, g);
   }
-  const groups = [...map.values()].sort((a, b) => b.value - a.value);
+  const perfOf = (g) => (g.cost ? (g.value - g.cost) / g.cost : 0);
+  const groups = [...map.values()].sort((a, b) => posSort === "perf" ? perfOf(b) - perfOf(a) || b.value - a.value : b.value - a.value);
   const total = groups.reduce((s, g) => s + g.value, 0), cost = groups.reduce((s, g) => s + g.cost, 0), pnl = total - cost;
   const byCls = {}; for (const g of groups) byCls[g.cls || "autre"] = (byCls[g.cls || "autre"] || 0) + g.value;
   if (!groups.length) return `
@@ -451,15 +453,18 @@ function viewPositions(P) {
   <section class="hero"><div class="eyebrow">Positions en portefeuille</div><div class="big">${fE(total)}</div>
     <div class="sub"><span class="${tone(pnl)}">${pnl >= 0 ? "+" : "−"}${fE(Math.abs(pnl))} · ${fP(cost ? (pnl / cost) * 100 : 0)}</span> sur ${fE(cost)} investis</div></section>
   <div class="panel kv">${Object.entries(byCls).sort((a, b) => b[1] - a[1]).map(([k, v]) => `<div><span>${ASSET_CLASSES[k] || k}</span><span>${fE(v)} · ${fP((v / total) * 100, 1)}</span></div>`).join("")}</div>
-  <section class="section"><div class="section-head"><h2>${groups.length} ligne${groups.length > 1 ? "s" : ""}</h2><span class="note">poids · +/- value</span></div>
-    <div class="panel list">${groups.map((g) => {
+  <section class="section"><div class="section-head"><h2>${groups.length} ligne${groups.length > 1 ? "s" : ""}</h2><span class="note">${posSort === "perf" ? "de la meilleure à la moins bonne" : "les plus grosses d'abord"}</span></div>
+    <div class="seg" role="tablist" aria-label="Trier les positions" style="margin-bottom:10px">${[["perf", "Performance"], ["poids", "Poids"]].map(([k, l]) => `<button role="tab" class="seg-b" aria-selected="${posSort === k}" data-possort="${k}">${l}</button>`).join("")}</div>
+    <div class="panel list">${groups.map((g, i) => {
       const gp = g.cost ? ((g.value - g.cost) / g.cost) * 100 : 0, pru = g.qty ? g.cost / g.qty : 0, w = total ? (g.value / total) * 100 : 0;
       const where = [...new Set(g.lines.map((l) => l.accName))].join(", ");
       const target = g.lines.length === 1 ? `data-act="edit-holding" data-id="${g.lines[0].id}"` : `data-act="open-account" data-id="${g.lines[0].accountId}"`;
-      return `<button class="row" ${target}><span><div class="name">${esc(g.name)}${g.ticker ? ` <span class="pill">${esc(g.ticker)}</span>` : ""}</div>
+      return `<button class="row" ${target}><span><div class="name">${posSort === "perf" ? `<span class="note" style="display:inline-block;min-width:1.6em">${i + 1}.</span>` : ""}${esc(g.name)}${g.ticker ? ` <span class="pill">${esc(g.ticker)}</span>` : ""}</div>
         <div class="meta">${esc(where)} · ${g.qty.toLocaleString("fr-FR", { maximumFractionDigits: 6 })} · PRU ${fE2(pru)}</div>
         <div class="bar" style="margin-top:6px;max-width:160px"><i style="width:${w.toFixed(1)}%"></i></div></span>
-        <span class="amt">${fE(g.value)}<small class="note">${fP(w, 1)}</small><small class="${tone(g.value - g.cost)}">${g.value >= g.cost ? "+" : "−"}${fE(Math.abs(g.value - g.cost))} · ${fP(gp, 1)}</small></span></button>`;
+        ${posSort === "perf"
+          ? `<span class="amt"><span class="${tone(g.value - g.cost)}">${g.cost < g.value * 0.01 ? "offerte" : (gp > 0 ? "+" : "") + fP(gp, 1)}</span><small class="${tone(g.value - g.cost)}">${g.value >= g.cost ? "+" : "−"}${fE(Math.abs(g.value - g.cost))}</small><small class="note">${fE(g.value)} · ${fP(w, 1)}</small></span></button>`
+          : `<span class="amt">${fE(g.value)}<small class="note">${fP(w, 1)}</small><small class="${tone(g.value - g.cost)}">${g.value >= g.cost ? "+" : "−"}${fE(Math.abs(g.value - g.cost))} · ${fP(gp, 1)}</small></span></button>`}`;
     }).join("")}</div></section>`;
 }
 
@@ -693,6 +698,7 @@ function setTab(t) {
 
 document.addEventListener("click", async (e) => {
   const sb = e.target.closest("[data-env]"); if (sb) { env = sb.dataset.env; return render(); }
+  const ps = e.target.closest("[data-possort]"); if (ps) { posSort = ps.dataset.possort; return render(); }
   const t = e.target.closest("[data-tab],[data-act]"); if (!t) return;
   if (t.dataset.tab) return setTab(t.dataset.tab);
   const id = t.dataset.id, act = t.dataset.act;
