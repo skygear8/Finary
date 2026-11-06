@@ -283,8 +283,10 @@ function propertyMetrics(p, loans) {
 }
 
 /* ---------------- État ---------------- */
-const S = { accounts: [], holdings: [], properties: [], loans: [], snapshots: [], ready: false, writable: true };
-const COLS = ["accounts", "holdings", "properties", "loans", "snapshots"];
+const S = { accounts: [], holdings: [], properties: [], loans: [], snapshots: [], flows: [], ready: false, writable: true };
+const COLS = ["accounts", "holdings", "properties", "loans", "snapshots", "flows"];
+const isInvestType = (t) => !["courant", "livret"].includes(t);
+let histRange = "all";
 let db = null, tab = "synthese", sheet = null;
 
 function portfolio() {
@@ -300,7 +302,8 @@ function portfolio() {
   })).filter((s) => s.value > 0);
   const assets = alloc.reduce((s, x) => s + x.value, 0);
   const debts = propRows.reduce((s, p) => s + p.m.debt, 0) + otherLoans.reduce((s, l) => s + l.s.remaining, 0);
-  return { accRows, propRows, otherLoans, alloc, assets, debts, net: assets - debts };
+  const inv = accRows.filter((a) => isInvestType(a.type)).reduce((s, a) => s + a.value, 0);
+  return { accRows, propRows, otherLoans, alloc, assets, debts, inv, net: assets - debts };
 }
 
 /* ---------------- Graphiques SVG ---------------- */
@@ -323,7 +326,7 @@ function lineChart(points, label) {
   const t0 = points[0].x, t1 = points[points.length - 1].x || t0 + 1;
   const X = (x) => pl + ((x - t0) / (t1 - t0 || 1)) * (W - pl - pr), Y = (y) => pt + (1 - (y - lo) / (hi - lo)) * (H - pt - pb);
   let grid = "";
-  for (let v = lo; v <= hi + 1e-6; v += step) grid += `<line x1="${pl}" x2="${W - pr}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--line)"/><text x="${pl - 6}" y="${Y(v) + 3}" text-anchor="end">${Math.round(v / 1000)} k€</text>`;
+  for (let v = lo; v <= hi + 1e-6; v += step) grid += `<line x1="${pl}" x2="${W - pr}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--line)"/><text x="${pl - 6}" y="${Y(v) + 3}" text-anchor="end">${(v / 1000).toLocaleString("fr-FR", { maximumFractionDigits: step < 1000 ? 1 : 0 })} k€</text>`;
   const d = points.map((p, i) => `${i ? "L" : "M"}${X(p.x).toFixed(1)},${Y(p.y).toFixed(1)}`).join("");
   const area = `${d}L${X(t1)},${H - pb}L${X(t0)},${H - pb}Z`;
   const fmt = (t) => new Date(t).toLocaleDateString("fr-FR", { month: "short", year: "2-digit" });
@@ -345,8 +348,12 @@ function viewSynthese(P) {
       <button class="btn" data-act="new-account">Ajouter un compte</button> <button class="btn ghost" data-act="new-property">Ajouter un bien</button></div>`;
   const rental = P.propRows.filter((p) => p.type !== "residence_principale");
   const cf = rental.reduce((s, p) => s + p.m.myCashflow, 0);
-  const hist = S.snapshots.map((s) => ({ x: new Date(s.id).getTime(), y: s.assets - s.debts })).sort((a, b) => a.x - b.x);
-  const first = hist[0], delta = first ? P.net - first.y : 0;
+  const snaps = S.snapshots.filter((s) => /^\d{4}-\d{2}-\d{2}$/.test(s.id)).sort((a, b) => a.id.localeCompare(b.id));
+  const allHist = snaps.map((s) => ({ x: new Date(s.id).getTime(), y: s.assets - s.debts }));
+  const first = allHist[0], delta = first ? P.net - first.y : 0;
+  const days = { "1m": 31, "3m": 92, "1a": 366 }[histRange];
+  const hist = days ? allHist.filter((p) => p.x >= Date.now() - days * 864e5) : allHist;
+  const dec = decomposition(P, snaps.length ? snaps[0] : null, hist.length ? snaps.find((s) => new Date(s.id).getTime() === hist[0].x) : null);
   return `
   <section class="hero">
     <div class="eyebrow">Patrimoine net</div>
@@ -365,9 +372,26 @@ function viewSynthese(P) {
     <div class="panel alloc">${donut(P.alloc)}<div class="legend">${P.alloc.map((a) => `<div><span class="dot" style="background:var(--c-${a.key})"></span><span>${a.label}</span><span class="pct">${fP((a.value / P.assets) * 100, 1)}</span><b>${fE(a.value)}</b></div>`).join("")}</div></div>
   </section>
   <section class="section">
-    <h2>Évolution du patrimoine net</h2>
+    <div class="section-head"><h2>Évolution du patrimoine net</h2></div>
+    <div class="seg" role="tablist" aria-label="Période" style="margin-bottom:10px">${[["1m", "1 mois"], ["3m", "3 mois"], ["1a", "1 an"], ["all", "Tout"]].map(([k, l]) => `<button role="tab" class="seg-b" aria-selected="${histRange === k}" data-range="${k}">${l}</button>`).join("")}</div>
     <div class="panel">${lineChart(hist, "Évolution du patrimoine net")}</div>
+    ${dec ? `<div class="panel kv" style="margin-top:10px">
+      <div class="strong"><span>Variation depuis le ${dec.from}</span><span class="${tone(dec.total)}">${sg(dec.total)}</span></div>
+      <div><span>Performance des placements</span><span class="${tone(dec.market)}">${sg(dec.market)}${dec.marketPct != null ? ` · ${dec.marketPct >= 0 ? "+" : ""}${fP(dec.marketPct, 1)}` : ""}</span></div>
+      <div><span>Épargne, versements et crédit remboursé</span><span class="${tone(dec.saved)}">${sg(dec.saved)}</span></div>
+      <div><span class="note">Versements notés sur tes placements : ${fE(dec.flows)}. La performance = variation des placements moins ces versements.</span></div>
+    </div>` : ""}
   </section>`;
+}
+const sg = (v) => (v >= 0 ? "+" : "−") + fE(Math.abs(v));
+// variation du net entre une photo et aujourd'hui, séparée entre marchés et épargne
+function decomposition(P, firstSnap, rangeSnap) {
+  const base = rangeSnap || firstSnap;
+  if (!base || base.inv == null || base.id === new Date().toISOString().slice(0, 10)) return null;
+  const flows = S.flows.filter((f) => f.date > base.id).reduce((a, f) => a + (Number(f.amount) || 0), 0);
+  const total = P.net - (base.assets - base.debts), market = P.inv - base.inv - flows;
+  return { from: new Date(base.id).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" }), total, market, saved: total - market, flows,
+    marketPct: base.inv + flows / 2 > 0 ? (market / (base.inv + flows / 2)) * 100 : null };
 }
 
 const ENVELOPES = [
@@ -443,7 +467,7 @@ function viewPositions(P) {
   const map = new Map();
   for (const h of all) {
     const key = (h.ticker || h.name).trim().toUpperCase();
-    const g = map.get(key) || { name: h.name, ticker: h.ticker, cls: h.cls, qty: 0, cost: 0, value: 0, lines: [] };
+    const g = map.get(key) || { name: h.name, ticker: h.ticker, cls: h.cls, expo: h.expo, qty: 0, cost: 0, value: 0, lines: [] };
     g.qty += h.qty; g.cost += h.qty * h.pru; g.value += h.qty * h.price; g.lines.push(h);
     map.set(key, g);
   }
@@ -458,6 +482,7 @@ function viewPositions(P) {
   <section class="hero"><div class="eyebrow">Positions en portefeuille</div><div class="big">${fE(total)}</div>
     <div class="sub"><span class="${tone(pnl)}">${pnl >= 0 ? "+" : "−"}${fE(Math.abs(pnl))} · ${fP(cost ? (pnl / cost) * 100 : 0)}</span> sur ${fE(cost)} investis</div></section>
   <div class="panel kv">${Object.entries(byCls).sort((a, b) => b[1] - a[1]).map(([k, v]) => `<div><span>${ASSET_CLASSES[k] || k}</span><span>${fE(v)} · ${fP((v / total) * 100, 1)}</span></div>`).join("")}</div>
+  ${exposure(groups, total)}
   <section class="section"><div class="section-head"><h2>${groups.length} ligne${groups.length > 1 ? "s" : ""}</h2><span class="note">${posSort === "perf" ? "de la meilleure à la moins bonne" : "les plus grosses d'abord"}</span></div>
     <div class="seg" role="tablist" aria-label="Trier les positions" style="margin-bottom:10px">${[["perf", "Performance"], ["poids", "Poids"]].map(([k, l]) => `<button role="tab" class="seg-b" aria-selected="${posSort === k}" data-possort="${k}">${l}</button>`).join("")}</div>
     <div class="panel list">${groups.map((g, i) => {
@@ -471,6 +496,23 @@ function viewPositions(P) {
           ? `<span class="amt"><span class="${tone(g.value - g.cost)}">${g.cost < g.value * 0.01 ? "offerte" : (gp > 0 ? "+" : "") + fP(gp, 1)}</span><small class="${tone(g.value - g.cost)}">${g.value >= g.cost ? "+" : "−"}${fE(Math.abs(g.value - g.cost))}</small><small class="note">${fE(g.value)} · ${fP(w, 1)}</small></span></button>`
           : `<span class="amt">${fE(g.value)}<small class="note">${fP(w, 1)}</small><small class="${tone(g.value - g.cost)}">${g.value >= g.cost ? "+" : "−"}${fE(Math.abs(g.value - g.cost))} · ${fP(gp, 1)}</small></span></button>`}`;
     }).join("")}</div></section>`;
+}
+
+// exposition réelle : chaque ligne porte sa répartition (expo.geo en %, expo.tech en %)
+function exposure(groups, total) {
+  const geo = {}; let tech = 0, known = 0;
+  for (const g of groups) {
+    if (!g.expo?.geo) { geo["Non renseigné"] = (geo["Non renseigné"] || 0) + g.value; continue; }
+    known += g.value; tech += g.value * (g.expo.tech || 0) / 100;
+    const sum = Object.values(g.expo.geo).reduce((a, b) => a + b, 0) || 100;
+    for (const [k, v] of Object.entries(g.expo.geo)) geo[k] = (geo[k] || 0) + g.value * v / sum;
+  }
+  if (!known) return "";
+  const rows = Object.entries(geo).sort((a, b) => b[1] - a[1]);
+  const bar = (label, v, sub) => `<div style="display:grid;gap:4px"><div class="section-head"><span>${label}</span><span><b>${fP((v / total) * 100, 1)}</b> <span class="note">${sub}</span></span></div><div class="bar"><i style="width:${((v / total) * 100).toFixed(1)}%"></i></div></div>`;
+  return `<section class="section"><div class="section-head"><h2>Exposition réelle</h2><span class="note">estimation, fonds et ETF regardés en transparence</span></div>
+    <div class="panel" style="display:grid;gap:12px">${rows.map(([k, v]) => bar(esc(k), v, fE(v))).join("")}</div>
+    <div class="panel" style="display:grid;gap:12px;margin-top:10px">${bar("Tech et télécoms", tech, fE(tech))}<p class="note">Part de tes placements dans la tech (logiciels, semi-conducteurs, internet, télécoms), toutes lignes confondues.</p></div></section>`;
 }
 
 function viewImmo(P) {
@@ -502,6 +544,8 @@ function sheetAccount(a) {
         <div class="meta">${h.qty.toLocaleString("fr-FR", { maximumFractionDigits: 6 })} × ${fE2(h.price)} · PRU ${fE2(h.pru)}</div></span>
         <span class="amt">${fE(v)}<small class="${tone(g)}">${g >= 0 ? "+" : "−"}${fE(Math.abs(g))} · ${fP(gp, 1)}</small></span></button>`;
     }).join("") || `<div class="empty">Aucune position.</div>`}</div></section>` : ""}
+  ${invest ? (() => { const fl = S.flows.filter((f) => f.accountId === a.id).sort((x, y) => y.date.localeCompare(x.date)); return `<section class="section"><div class="section-head"><h2>Versements</h2><button class="btn ghost" data-act="new-flow" data-id="${a.id}">Ajouter</button></div>
+    <div class="panel list">${fl.map((f) => `<button class="row" data-act="edit-flow" data-id="${f.id}"><span><div class="name">${new Date(f.date).toLocaleDateString("fr-FR")}</div><div class="meta">${esc(f.note || (f.amount >= 0 ? "Versement" : "Retrait"))}</div></span><span class="amt ${tone(f.amount)}">${sg(Number(f.amount) || 0)}</span></button>`).join("") || `<div class="empty">Note ici l'argent que tu ajoutes (ou retires) sur ce compte : Socle s'en sert pour séparer ton épargne de la performance des marchés.</div>`}</div></section>`; })() : ""}
   <div class="section actions"><button class="btn ghost" data-act="edit-account" data-id="${a.id}">Modifier le compte</button></div>`;
 }
 
@@ -630,6 +674,8 @@ const F = {
     ["Acquisition et valeur", [["price", "Prix d'achat (€)", "number", { req: 1 }], ["notary", "Frais de notaire et d'acquisition (€)", "number"], ["works", "Travaux (€)", "number"], ["value", "Valeur estimée (€)", "number"]]],
     ["Ton apport (si détenu via une société)", [["capital", "Capital social versé (€)", "number"], ["cca", "Compte courant d'associé (€)", "number"]]],
     ["Loyers et charges", [["rent", "Loyer mensuel HC (€)", "number"], ["charges", "Copro non récup. / mois (€)", "number"], ["tax", "Taxe foncière / an (€)", "number"], ["pno", "Assurance PNO / an (€)", "number"], ["mgmt", "Gestion (% des loyers)", "number"], ["vacancy", "Vacance locative (%)", "number"]]]] },
+  flow: { title: "Versement", col: "flows", groups: [[null, [
+    ["date", "Date", "date", { req: 1 }], ["amount", "Montant (€, négatif pour un retrait)", "number", { req: 1 }], ["note", "Note", "text", { full: 1, ph: "Versement mensuel, abondement…" }]]]] },
   loan: { title: "Crédit", col: "loans", groups: [[null, [
     ["name", "Nom", "text", { full: 1, def: "Prêt immobilier" }], ["principal", "Montant emprunté (€)", "number", { req: 1 }], ["rate", "Taux nominal (%)", "number", { req: 1 }],
     ["years", "Durée (années)", "number", { def: 20, req: 1 }], ["start", "Date de déblocage", "date", { req: 1 }], ["insurance", "Assurance / mois (€)", "number"], ["fees", "Frais de dossier et garantie (€)", "number"]]]] },
@@ -647,12 +693,12 @@ function formHtml(kind, data, extra) {
     return `<label class="${o.full ? "full" : ""}" for="${id}">${label}${input}</label>`;
   };
   return `
-  <div class="sheet-head"><h2>${data ? (kind === "property" ? "Paramètres du bien" : "Modifier : " + f.title.toLowerCase()) : "Ajouter : " + f.title.toLowerCase()}</h2><button class="x" data-act="close" aria-label="Fermer">×</button></div>
+  <div class="sheet-head"><h2>${data && !data.__new ? (kind === "property" ? "Paramètres du bien" : "Modifier : " + f.title.toLowerCase()) : "Ajouter : " + f.title.toLowerCase()}</h2><button class="x" data-act="close" aria-label="Fermer">×</button></div>
   <form class="f" data-kind="${kind}" data-id="${data?.id || ""}" data-parent="${extra?.parent || ""}">
     ${f.groups.map(([lg, fs]) => `<fieldset>${lg ? `<legend>${lg}</legend>` : ""}${fs.map(field).join("")}</fieldset>`).join("")}
     <p class="err" id="form-err" hidden></p>
     <div class="actions"><button class="btn" type="submit">Enregistrer</button>
-      ${data ? `<button class="btn danger" type="button" data-act="delete" data-kind="${kind}" data-id="${data.id}">Supprimer</button>` : ""}</div>
+      ${data && !data.__new ? `<button class="btn danger" type="button" data-act="delete" data-kind="${kind}" data-id="${data.id}">Supprimer</button>` : ""}</div>
   </form>`;
 }
 
@@ -671,7 +717,7 @@ function readForm(form) {
 /* ---------------- Sauvegarde ---------------- */
 async function save(col, id, data) {
   if (!db) throw new Error("La sauvegarde n'est pas disponible dans cette vue.");
-  if (id) await db.collection(col).doc(id).set({ ...data, updatedAt: new Date().toISOString() });
+  if (id) { const { id: _drop, ...old } = S[col].find((x) => x.id === id) || {}; await db.collection(col).doc(id).set({ ...old, ...data, updatedAt: new Date().toISOString() }); }
   else return (await db.collection(col).add({ ...data, createdAt: new Date().toISOString() })).id;
 }
 async function remove(kind, id) {
@@ -686,8 +732,8 @@ async function snapshotToday() {
   const P = portfolio(); if (!P.assets && !P.debts) return;
   const id = new Date().toISOString().slice(0, 10), cur = S.snapshots.find((s) => s.id === id);
   snapDone = true;
-  if (cur && Math.round(cur.assets) === Math.round(P.assets) && Math.round(cur.debts) === Math.round(P.debts)) return;
-  try { await db.collection("snapshots").doc(id).set({ assets: Math.round(P.assets), debts: Math.round(P.debts) }); } catch { /* lecture seule */ }
+  if (cur && Math.round(cur.assets) === Math.round(P.assets) && Math.round(cur.debts) === Math.round(P.debts) && Math.round(cur.inv ?? -1) === Math.round(P.inv)) return;
+  try { await db.collection("snapshots").doc(id).set({ assets: Math.round(P.assets), debts: Math.round(P.debts), inv: Math.round(P.inv), by: "page" }); } catch { /* lecture seule */ }
 }
 
 /* ---------------- Rendu ---------------- */
@@ -726,6 +772,7 @@ function setTab(t) {
 document.addEventListener("click", async (e) => {
   const sb = e.target.closest("[data-env]"); if (sb) { env = sb.dataset.env; return render(); }
   const ps = e.target.closest("[data-possort]"); if (ps) { posSort = ps.dataset.possort; return render(); }
+  const rg = e.target.closest("[data-range]"); if (rg) { histRange = rg.dataset.range; return render(); }
   const t = e.target.closest("[data-tab],[data-act]"); if (!t) return;
   if (t.dataset.tab) return setTab(t.dataset.tab);
   const id = t.dataset.id, act = t.dataset.act;
@@ -743,6 +790,8 @@ document.addEventListener("click", async (e) => {
   else if (act === "edit-property" && t.dataset.focus === "__loan") openForm("loan", null, { parent: id });
   else if (act === "edit-property") { openForm("property", find("properties")); const f = t.dataset.focus && document.getElementById("f-property-" + t.dataset.focus); if (f) { f.scrollIntoView({ block: "center" }); f.focus(); } }
   else if (act === "new-loan") openForm("loan", null, { parent: id });
+  else if (act === "new-flow") openForm("flow", { date: new Date().toISOString().slice(0, 10) , __new: 1 }, { parent: id });
+  else if (act === "edit-flow") openForm("flow", find("flows"), { parent: find("flows")?.accountId });
   else if (act === "edit-loan") openForm("loan", find("loans"), { parent: find("loans")?.propertyId });
   else if (act === "delete") {
     if (t.dataset.confirm !== "1") { t.dataset.confirm = "1"; t.textContent = "Confirmer la suppression"; return; }
@@ -758,6 +807,7 @@ document.addEventListener("submit", async (e) => {
   const data = readForm(form);
   if (kind === "holding") data.accountId = parent;
   if (kind === "loan") data.propertyId = parent;
+  if (kind === "flow") data.accountId = parent;
   const old = id ? S[F[kind].col].find((x) => x.id === id) : null;
   if (old?.createdAt) data.createdAt = old.createdAt;
   const btn = form.querySelector("[type=submit]"); btn.disabled = true; btn.textContent = "Enregistrement…";
