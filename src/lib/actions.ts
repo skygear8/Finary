@@ -2,7 +2,8 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { eq } from "drizzle-orm";
-import Papa from "papaparse";
+import { csvConnector } from "./connectors/csv";
+import { applySync } from "./connectors/sync";
 import { db, schema } from "@/db";
 
 const str = (f: FormData, k: string) => {
@@ -147,58 +148,16 @@ export async function deleteLoan(id: number) {
 /* ---------- Import CSV ---------- */
 export type ImportResult = { ok: boolean; message: string };
 
-/**
- * Colonnes attendues (séparateur , ou ;) :
- * compte;type_compte;nom;ticker;classe;quantite;pru;cours
- * Une ligne sans nom de position met à jour les liquidités du compte (colonne cours = solde).
- */
+/** Import CSV via la couche connecteurs : les positions d'un compte présent dans le fichier sont remplacées. */
 export async function importCsv(_prev: ImportResult | null, f: FormData): Promise<ImportResult> {
   const file = f.get("file");
   if (!(file instanceof File) || file.size === 0) return { ok: false, message: "Aucun fichier sélectionné." };
-  const text = await file.text();
-  const parsed = Papa.parse<Record<string, string>>(text, {
-    header: true,
-    skipEmptyLines: true,
-    transformHeader: (h) => h.trim().toLowerCase(),
-  });
-  if (parsed.errors.length) return { ok: false, message: `CSV illisible : ${parsed.errors[0].message}` };
-
-  const n = (v?: string) => Number((v ?? "0").replace(/\s/g, "").replace(",", ".")) || 0;
-  let positions = 0;
-  let created = 0;
-  db.transaction((tx) => {
-    for (const r of parsed.data) {
-      const accName = r["compte"]?.trim();
-      if (!accName) continue;
-      let acc = tx.select().from(schema.accounts).where(eq(schema.accounts.name, accName)).get();
-      if (!acc) {
-        acc = tx
-          .insert(schema.accounts)
-          .values({ name: accName, type: (r["type_compte"]?.trim() || "cto") as never, cash: 0, createdAt: now() })
-          .returning()
-          .get();
-        created++;
-      }
-      const name = r["nom"]?.trim();
-      if (!name) {
-        tx.update(schema.accounts).set({ cash: n(r["cours"]) }).where(eq(schema.accounts.id, acc.id)).run();
-        continue;
-      }
-      tx.insert(schema.holdings)
-        .values({
-          accountId: acc.id,
-          name,
-          ticker: r["ticker"]?.trim() || null,
-          assetClass: r["classe"]?.trim() || "etf",
-          quantity: n(r["quantite"]),
-          avgPrice: n(r["pru"]),
-          currentPrice: n(r["cours"]) || n(r["pru"]),
-          updatedAt: now(),
-        })
-        .run();
-      positions++;
-    }
-  });
-  refresh();
-  return { ok: true, message: `${positions} position(s) importée(s), ${created} compte(s) créé(s).` };
+  try {
+    const accounts = await csvConnector.fetchAccounts(await file.text());
+    const r = applySync(csvConnector, accounts);
+    refresh();
+    return { ok: true, message: `${r.positions} position(s) importée(s), ${r.created} compte(s) créé(s), ${r.updated} mis à jour.` };
+  } catch (e) {
+    return { ok: false, message: (e as Error).message };
+  }
 }

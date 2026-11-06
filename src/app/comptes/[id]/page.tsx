@@ -24,7 +24,9 @@ export default async function Compte({ params }: { params: Promise<{ id: string 
     <>
       <Link href="/comptes" className="text-xs text-muted">← Comptes</Link>
       <PageHeader title={a.name}>
-        <span className="text-sm text-muted">{ACCOUNT_TYPES[a.type]} {a.institution && `· ${a.institution}`}</span>
+        <span className="text-sm text-muted">{ACCOUNT_TYPES[a.type]} {a.institution && `· ${a.institution}`}
+          {a.source !== "manual" && ` · source ${a.source.toUpperCase()}`}
+          {a.lastSyncedAt && `, mis à jour le ${new Date(a.lastSyncedAt).toLocaleDateString("fr-FR")}`}</span>
       </PageHeader>
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Kpi label="Valeur totale" value={fmtEur(value)} />

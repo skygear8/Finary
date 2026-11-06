@@ -35,6 +35,15 @@ if (!globalForDb.sqlite) {
       duration_months INTEGER NOT NULL, start_date TEXT NOT NULL, insurance_monthly REAL NOT NULL DEFAULT 0);
     CREATE TABLE IF NOT EXISTS snapshots (date TEXT PRIMARY KEY, assets REAL NOT NULL, debts REAL NOT NULL);
   `);
+  // Migrations légères : ajoute les colonnes manquantes sur une base existante.
+  const addColumn = (table: string, col: string, def: string) => {
+    const cols = sqlite.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[];
+    if (!cols.some((c) => c.name === col)) sqlite.exec(`ALTER TABLE ${table} ADD COLUMN ${col} ${def}`);
+  };
+  addColumn("accounts", "source", "TEXT NOT NULL DEFAULT 'manual'");
+  addColumn("accounts", "external_id", "TEXT");
+  addColumn("accounts", "last_synced_at", "TEXT");
+  addColumn("holdings", "external_id", "TEXT");
   globalForDb.sqlite = sqlite;
 }
 

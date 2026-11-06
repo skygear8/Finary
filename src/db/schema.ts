@@ -36,6 +36,9 @@ export const accounts = sqliteTable("accounts", {
   institution: text("institution"),
   cash: real("cash").notNull().default(0), // liquidités du compte
   createdAt: text("created_at").notNull(),
+  source: text("source").notNull().default("manual"), // manual | csv | powens | bridge…
+  externalId: text("external_id"), // identifiant chez l'agrégateur
+  lastSyncedAt: text("last_synced_at"),
 });
 
 export const holdings = sqliteTable("holdings", {
@@ -48,6 +51,7 @@ export const holdings = sqliteTable("holdings", {
   avgPrice: real("avg_price").notNull(), // PRU
   currentPrice: real("current_price").notNull(),
   updatedAt: text("updated_at").notNull(),
+  externalId: text("external_id"),
 });
 
 export const properties = sqliteTable("properties", {
