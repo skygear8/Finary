@@ -1489,7 +1489,7 @@ function forecastSection(D, balRows) {
 }
 
 // 2. équilibre du compte joint : qui a versé quoi face aux dépenses du joint
-const whoOf = (t) => t.by || (/halbaut|nathan/.test(normL(t.label)) ? "nathan" : /rochetti|angel/.test(normL(t.label)) ? "angelique" : null);
+const whoOf = (t) => t.by || (/halbaut|nathan/.test(normL(t.label)) ? "nathan" : /rochetti|angel|virement depuis boursobank/.test(normL(t.label)) ? "angelique" : null);
 function jointCalc(list) {
   const by = { nathan: 0, angelique: 0 }, unk = [];
   for (const t of list.filter((t) => t.amount > 0 && t.c === "interne")) { const w = whoOf(t); if (w in by) by[w] += t.amount; else if (w !== "autre") unk.push(t); }
