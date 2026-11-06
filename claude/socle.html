@@ -263,6 +263,18 @@ details.fold > .section-head { margin-top: 6px; }
 label.chk { display: flex; gap: 8px; align-items: flex-start; color: var(--fg); font-size: 13px; }
 label.chk input { width: auto; margin-top: 2px; }
 .section .actions .btn.sm { flex: 0 0 auto; }
+.catrow.over .cv { color: var(--loss); }
+.catrow .cn small b { color: var(--loss); font-weight: 600; }
+.pill.overp { background: color-mix(in srgb, var(--loss) 14%, transparent); color: var(--loss); }
+.goals { display: grid; gap: 4px; padding-block: 6px; }
+.goal { appearance: none; background: none; border: 0; border-top: 1px solid var(--line); color: inherit; font: inherit; text-align: left; cursor: pointer; display: grid; gap: 7px; padding: 12px 2px; }
+.goal:first-child { border-top: 0; }
+.goal .gh { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; }
+.goal .gh small { color: var(--muted); font-weight: 400; }
+.goal .bar { height: 8px; }
+label.rng { display: grid; grid-template-columns: 1fr auto; gap: 6px 10px; align-items: center; color: var(--fg); font-size: 13px; margin-bottom: 12px; }
+label.rng input { grid-column: 1 / -1; padding: 0; border: 0; background: none; accent-color: var(--accent); }
+label.rng b { font-family: var(--font-display); }
 </style>
 
 <div class="wrap">
@@ -381,10 +393,12 @@ function propertyMetrics(p, loans) {
 
 /* ---------------- État ---------------- */
 const S = { accounts: [], holdings: [], properties: [], loans: [], snapshots: [], flows: [], ready: false, writable: true };
-const COLS = ["accounts", "holdings", "properties", "loans", "snapshots", "flows", "tx", "rules"];
+const COLS = ["accounts", "holdings", "properties", "loans", "snapshots", "flows", "tx", "rules", "caps", "goals"];
 // profils : chaque compte / bien porte `profile` (absent = nathan). R garde tout, S ne montre que le profil choisi.
 const PROFILES = [{ k: "nathan", label: "Nathan" }, { k: "angelique", label: "Angélique" }, { k: "foyer", label: "Foyer" }];
-const R = { accounts: [], holdings: [], properties: [], loans: [], snapshots: [], flows: [], tx: [], rules: [] };
+const R = { accounts: [], holdings: [], properties: [], loans: [], snapshots: [], flows: [], tx: [], rules: [], caps: [], goals: [] };
+const openFolds = new Set();
+document.addEventListener("toggle", (e) => { const d = e.target; if (d?.dataset?.fold) d.open ? openFolds.add(d.dataset.fold) : openFolds.delete(d.dataset.fold); }, true);
 let profile = "nathan"; try { const v = localStorage.getItem("socle-profil"); if (PROFILES.some((p) => p.k === v)) profile = v; } catch { }
 const ownerOf = (x) => x.profile || "nathan";
 const snapPrefix = (k) => (k === "nathan" ? "" : k + "_");
@@ -491,6 +505,7 @@ function viewSynthese(P) {
     ${tile("Plus-values latentes", fE(P.accRows.reduce((s, a) => s + a.hs.reduce((t, h) => t + h.qty * (h.price - h.pru), 0), 0)), "Bourse et crypto", tone(P.accRows.reduce((s, a) => s + a.hs.reduce((t, h) => t + h.qty * (h.price - h.pru), 0), 0)))}
   </div>
   <div class="section"><div class="panel monthly"><span><b>Mise à jour du mois</b><div class="note">${lastUpdateText()}</div></span><button class="btn" data-act="monthly">Mettre à jour</button></div></div>
+  ${goalsSection(P)}
   <section class="section">
     <h2>Répartition</h2>
     <div class="panel alloc">${donut(P.alloc)}<div class="legend">${P.alloc.map((a) => `<div><span class="dot" style="background:var(--c-${a.key})"></span><span>${a.label}</span><span class="pct">${fP((a.value / P.assets) * 100, 1)}</span><b>${fE(a.value)}</b></div>`).join("")}</div></div>
@@ -508,9 +523,11 @@ function viewSynthese(P) {
     </div>` : ""}
   </section>
   <div class="section-head" style="margin-top:28px"><h2 class="h-lg">Analyses</h2><span class="note">touche pour déplier</span></div>
+  ${projSection(P)}
   ${ytdTable(P)}
   ${costTable(P)}
-  ${feesTable(P)}`;
+  ${feesTable(P)}
+  ${taxSection(P)}`;
 }
 // ce que tu as mis (prix d'achat, PRU, apport) face à ce que ça vaut aujourd'hui
 function costTable(P) {
@@ -920,7 +937,7 @@ function catOf(t) {
 }
 const isBudgetAcc = (a) => a.type === "courant" && !/trade republic/i.test(a.institution || "");
 const isJointAcc = (a) => a.joint || /joint/i.test(a.name || "");
-let bMonth = null, bScope = "all", bCat = null, bImport = null;
+let bMonth = null, bScope = "all", bCat = null, bImport = null, lastAvgs = {};
 function budgetData() {
   const accs = R.accounts.filter(isBudgetAcc);
   const perso = accs.filter((a) => !isJointAcc(a) && (profile === "foyer" || ownerOf(a) === profile));
@@ -966,8 +983,11 @@ function viewBudget() {
   const scopeSeg = `<div class="seg" role="tablist" aria-label="Comptes">${[["all", "Tout"], ["perso", profile === "foyer" ? "Comptes perso" : "Mes comptes"], ["joint", "Compte joint"]].map(([k, l]) => `<button role="tab" class="seg-b" aria-selected="${bScope === k}" data-bscope="${k}">${l}</button>`).join("")}</div>`;
   const balRows = [...D.perso.map((a) => ({ id: a.id, n: a.name, inst: accLabel(a.id), v: a.cash || 0 })), ...(D.hasJoint ? [{ id: "joint", n: "Compte joint", inst: "BoursoBank · à deux", v: D.jointBal }] : [])]
     .filter((r) => bScope === "all" || (bScope === "joint") === (r.id === "joint"));
-  const cats = Object.entries(T.by).filter(([c, v]) => BCATS[c][1] === "out" && v < 0).map(([c, v]) => ({ c, v: -v })).sort((a, b) => b.v - a.v);
+  const caps = capsOf();
+  const cats = Object.keys(BCATS).filter((c) => BCATS[c][1] === "out" && ((T.by[c] || 0) < 0 || caps[c])).map((c) => ({ c, v: Math.max(0, -(T.by[c] || 0)), cap: caps[c] })).sort((a, b) => b.v - a.v || (b.cap || 0) - (a.cap || 0));
   const maxCat = Math.max(1, ...cats.map((x) => x.v));
+  lastAvgs = Object.fromEntries(Object.keys(BCATS).map((c) => [c, avg(c) != null ? -avg(c) : null]));
+  const over = cats.filter((x) => x.cap && x.v > x.cap).length;
   const list = cur.filter((t) => !bCat || t.c === bCat).sort((a, b) => b.date.localeCompare(a.date) || a.amount - b.amount);
   const days = [...new Set(list.map((t) => t.date))];
   const head = `
@@ -989,10 +1009,12 @@ function viewBudget() {
     ${tile("Taux d'épargne", rate != null ? fP(rate, 0) : "—", "part des revenus non dépensée", rate != null ? tone(rate) : "")}
   </div>
   <div class="section">${scopeSeg}</div>
-  <section class="section"><div class="section-head"><h2>Où part l'argent</h2><span class="total">${fE(T.out)}</span></div>
-    <div class="panel cats">${cats.map(({ c, v }) => { const a = avg(c), [l, , col] = BCATS[c]; return `<button class="catrow" data-bcat="${c}" aria-pressed="${bCat === c}">
-      <span class="dot" style="background:${col}"></span><span class="cn">${l}${a != null ? `<small>moy. ${fE(-a)}</small>` : ""}</span><span class="cv">${fE(v)}<small>${T.out ? fP((v / T.out) * 100, 0) : ""}</small></span>
-      <span class="bar"><i style="width:${((v / maxCat) * 100).toFixed(1)}%;background:${col}"></i></span></button>`; }).join("") || `<div class="empty">Aucune dépense ce mois-ci.</div>`}</div></section>
+  <section class="section"><div class="section-head"><h2>Où part l'argent</h2><span class="total">${over ? `<span class="pill overp">${over} plafond${over > 1 ? "s" : ""} dépassé${over > 1 ? "s" : ""}</span> ` : ""}${fE(T.out)}</span></div>
+    <div class="panel cats">${cats.map(({ c, v, cap }) => { const a = avg(c), [l, , col] = BCATS[c], ct = capTone(v, cap); return `<button class="catrow ${ct}" data-bcat="${c}" aria-pressed="${bCat === c}">
+      <span class="dot" style="background:${col}"></span><span class="cn">${l}<small>${cap ? `plafond ${fE(cap)}${ct === "over" ? ` · <b>+${fE(v - cap)}</b>` : ` · reste ${fE(cap - v)}`}` : a != null ? `moy. ${fE(-a)}` : ""}</small></span><span class="cv">${fE(v)}<small>${cap ? fP((v / cap) * 100, 0) + " du plafond" : T.out ? fP((v / T.out) * 100, 0) : ""}</small></span>
+      <span class="bar"><i style="width:${(cap ? Math.min(100, (v / cap) * 100) : (v / maxCat) * 100).toFixed(1)}%;background:${ct === "over" ? "var(--loss)" : ct === "near" ? "#d9822b" : col}"></i></span></button>`; }).join("") || `<div class="empty">Aucune dépense ce mois-ci.</div>`}
+      ${S.writable ? `<button class="btn ghost sm" data-act="tx-caps" style="margin:6px 4px 2px;justify-self:start">${Object.keys(caps).length ? "Modifier les plafonds" : "Fixer des plafonds"}</button>` : ""}</div></section>
+  ${recurringSection(D)}
   <section class="section"><div class="section-head"><h2>12 derniers mois</h2><span class="note"><span class="dot" style="display:inline-block;background:var(--gold)"></span> revenus <span class="dot" style="display:inline-block;background:var(--accent);margin-left:6px"></span> dépenses</span></div>
     <div class="panel">${budgetBars(series)}</div></section>
   <section class="section"><h2>Comptes courants</h2><div class="panel list">${balRows.map(balRow).join("")}</div></section>
@@ -1142,9 +1164,206 @@ document.addEventListener("change", async (e) => {
   openSheet({ html: sheetImport() });
 });
 
+/* ---------------- Plafonds, abonnements, objectifs, projection, fiscalité ---------------- */
+// plafonds : collection caps {profile, cat, amount} (id profil_cat)
+const capsOf = () => Object.fromEntries(R.caps.filter((c) => c.profile === profile && c.amount > 0).map((c) => [c.cat, c.amount]));
+const capTone = (v, cap) => !cap ? "" : v > cap ? "over" : v >= cap * 0.85 ? "near" : "ok";
+function sheetCaps(avgs) {
+  const caps = capsOf();
+  return `<div class="sheet-head"><h2>Plafonds mensuels</h2><button class="x" data-act="close" aria-label="Fermer">×</button></div>
+  <form class="f" data-kind="caps">
+    <p class="note">Un plafond par catégorie de dépenses (profil ${PROFILES.find((p) => p.k === profile).label}). Laisse vide pour ne pas en mettre. La suggestion grisée est ta moyenne.</p>
+    <fieldset>${Object.entries(BCATS).filter(([, [, k]]) => k === "out").map(([c, [l]]) => `<label>${l}<input name="${c}" inputmode="decimal" value="${caps[c] ?? ""}" placeholder="${avgs[c] ? "moy. " + Math.round(avgs[c] / 10) * 10 : ""}"></label>`).join("")}</fieldset>
+    <p class="err" id="form-err" hidden></p>
+    <div class="actions"><button class="btn" type="submit">Enregistrer</button></div>
+  </form>`;
+}
+async function saveCaps(form) {
+  const fd = new FormData(form), btn = form.querySelector("[type=submit]"), old = capsOf();
+  btn.disabled = true; btn.textContent = "Enregistrement…";
+  try {
+    for (const [c, [, k]] of Object.entries(BCATS)) {
+      if (k !== "out") continue;
+      const v = String(fd.get(c) ?? "").trim(), id = `${profile}_${c}`;
+      if (v && num(v) > 0) { if (num(v) !== old[c]) await db.collection("caps").doc(id).set({ profile, cat: c, amount: num(v) }); }
+      else if (old[c]) await db.collection("caps").doc(id).delete();
+    }
+    closeSheet();
+  } catch (err) { showErr(err); btn.disabled = false; btn.textContent = "Enregistrer"; }
+}
+// abonnements et prélèvements réguliers, repérés sur les 3 derniers mois
+const RECUR_RE = /assurance|axa|maif|macif|matmut|lolivier|bank|credit|pret|loyer|lintot|gestion|syndic|edf|engie|veolia|mutuelle|telecom|bouygues|free|sfr|orange|sosh|netflix|spotify|deezer|disney|canal|prime|icloud|apple|google|anthropic|openai|finary|basic.?fit|fitness/;
+function recurring(D, endMonth) {
+  const from = shiftM(endMonth, -2);
+  const out = D.tx.filter((t) => t.amount < 0 && ym(t.date) >= from && ym(t.date) <= endMonth && !["interne", "epargne", "courses", "resto"].includes(t.c));
+  const g = {};
+  for (const t of out) { const k = ruleKey(t.label) || normL(t.label); (g[k] ||= []).push(t); }
+  return Object.values(g).map((ts) => {
+    ts.sort((a, b) => b.date.localeCompare(a.date));
+    const months = new Set(ts.map((t) => ym(t.date))), last = ts[0], amts = ts.map((t) => -t.amount);
+    const steady = months.size >= 2 && ts.length <= months.size + 1 && Math.max(...amts) <= Math.min(...amts) * 1.2;
+    const known = (last.c === "abos" || RECUR_RE.test(normL(last.label))) && -last.amount < 1500;
+    if (!steady && !known) return null;
+    const perMonth = ts.length > months.size ? amts.reduce((a, b) => a + b, 0) / months.size : -last.amount;
+    return { label: last.label, c: last.c, perMonth, last: last.date, n: months.size };
+  }).filter(Boolean).sort((a, b) => b.perMonth - a.perMonth);
+}
+function recurringSection(D) {
+  const rec = recurring(D, bMonth);
+  if (!rec.length) return "";
+  const tot = rec.reduce((s, r) => s + r.perMonth, 0);
+  return `<details class="section fold"><summary><span class="fold-t"><h2>Abonnements et prélèvements</h2><span class="note">${rec.length} repérés · ${fE(tot)} par mois</span></span><b>${fE(tot * 12)}<small> /an</small></b></summary>
+    <div class="panel list">${rec.map((r) => `<div class="row" style="cursor:default"><span class="txl"><span class="dot" style="background:${BCATS[r.c][2]}"></span><span style="min-width:0"><div class="name">${esc(r.label)}</div><div class="meta">${BCATS[r.c][0]} · dernier le ${new Date(r.last).toLocaleDateString("fr-FR", { day: "numeric", month: "short" })}${r.n > 1 ? ` · ${r.n} mois` : ""}</div></span></span><span class="amt">${fE2(r.perMonth)}<small>${fE(r.perMonth * 12)} /an</small></span></div>`).join("")}</div>
+    <p class="note">Repérés d'après les libellés et les montants qui reviennent chaque mois. Les montants sont supposés mensuels.</p></details>`;
+}
+// épargne nette mensuelle moyenne (budget) : base des objectifs et de la projection
+function avgSaving() {
+  const keep = bScope; bScope = "all"; const D = budgetData(); bScope = keep;
+  const now = new Date().toISOString().slice(0, 7);
+  const months = [...new Set(D.tx.map((t) => ym(t.date)))].filter((m) => m < now).sort().slice(-3);
+  if (!months.length) return null;
+  const s = months.map((m) => monthTotals(D.tx.filter((t) => ym(t.date) === m)));
+  return { save: s.reduce((a, x) => a + x.save, 0) / s.length, rest: s.reduce((a, x) => a + x.rest, 0) / s.length, out: s.reduce((a, x) => a + x.out, 0) / s.length, n: months.length };
+}
+// objectifs : collection goals {profile, name, target, accounts[], date?}
+function goalsSection(P) {
+  const goals = R.goals.filter((g) => profile === "foyer" || g.profile === profile);
+  const av = avgSaving(), pace = av ? Math.max(0, av.save) : 0;
+  const rows = goals.map((g) => {
+    const cur = P.accRows.filter((a) => (g.accounts || []).includes(a.id)).reduce((s, a) => s + a.value, 0);
+    const pct = g.target ? Math.min(100, (cur / g.target) * 100) : 0, left = Math.max(0, g.target - cur);
+    let eta = left <= 0 ? "Objectif atteint" : pace > 0 ? `au rythme actuel (${fE(pace)}/mois) : ${new Date(Date.now() + (left / pace) * 30.4 * 864e5).toLocaleDateString("fr-FR", { month: "long", year: "numeric" })}` : "épargne nette nulle ces derniers mois : pas d'estimation";
+    if (left > 0 && g.date) { const m = Math.max(1, (new Date(g.date) - Date.now()) / (30.4 * 864e5)); eta += ` · pour le ${new Date(g.date).toLocaleDateString("fr-FR")} : ${fE(left / m)}/mois`; }
+    return `<button class="goal" data-act="edit-goal" data-id="${g.id}"><span class="gh"><b>${esc(g.name)}</b><span>${fE(cur)} <small>/ ${fE(g.target)}</small></span></span>
+      <span class="bar"><i style="width:${pct.toFixed(1)}%;background:${pct >= 100 ? "var(--gain)" : "linear-gradient(90deg,var(--accent),var(--gold))"}"></i></span>
+      <span class="note">${fP(pct, 0)}${left > 0 ? ` · il manque ${fE(left)}` : ""} · ${eta}</span></button>`;
+  }).join("");
+  const livA = P.accRows.find((a) => a.type === "livret" && /livret a/i.test(a.name));
+  const liq = P.accRows.filter((a) => a.type === "livret").map((a) => a.id);
+  const sugg = goals.length ? "" : `<div class="seg" style="margin-top:2px">
+      ${livA ? `<button class="seg-b" data-act="new-goal" data-preset='${esc(JSON.stringify({ name: "Livret A au plafond", target: 22950, accounts: [livA.id] }))}'>+ Livret A au plafond</button>` : ""}
+      ${av ? `<button class="seg-b" data-act="new-goal" data-preset='${esc(JSON.stringify({ name: "Réserve de 6 mois de dépenses", target: Math.round(av.out * 6 / 100) * 100, accounts: liq }))}'>+ Réserve de 6 mois</button>` : ""}</div>`;
+  return `<section class="section"><div class="section-head"><h2>Objectifs</h2>${S.writable && profile !== "foyer" ? `<button class="btn ghost sm" data-act="new-goal">Ajouter</button>` : ""}</div>
+    ${rows ? `<div class="panel goals">${rows}</div>` : `<div class="panel empty" style="padding:14px">Fixe-toi un cap : un montant à atteindre sur un ou plusieurs comptes.${profile === "foyer" ? "<br>Choisis Nathan ou Angélique pour en ajouter." : ""}</div>`}${profile !== "foyer" ? sugg : ""}</section>`;
+}
+function sheetGoal(g) {
+  const d = g || {};
+  const accs = S.accounts.filter((a) => a.type !== "courant");
+  return `<div class="sheet-head"><h2>${g?.id ? "Objectif" : "Nouvel objectif"}</h2><button class="x" data-act="close" aria-label="Fermer">×</button></div>
+  <form class="f" data-kind="goal" data-id="${g?.id || ""}">
+    <fieldset>
+      <label class="full">Nom<input name="name" value="${esc(d.name || "")}" required placeholder="Apport appartement, voyage…"></label>
+      <label>Montant visé (€)<input name="target" inputmode="decimal" value="${d.target ?? ""}" required></label>
+      <label>Date visée (facultatif)<input name="date" type="date" value="${esc(d.date || "")}"></label>
+    </fieldset>
+    <fieldset><legend>Comptes qui comptent pour cet objectif</legend>
+      ${accs.map((a) => `<label class="full chk"><input type="checkbox" name="acc" value="${a.id}" ${(d.accounts || []).includes(a.id) ? "checked" : ""}> ${esc(a.name)} <span class="note">${esc(a.institution || "")}</span></label>`).join("")}
+    </fieldset>
+    <p class="err" id="form-err" hidden></p>
+    <div class="actions"><button class="btn" type="submit">Enregistrer</button>${g?.id ? `<button class="btn danger" type="button" data-act="delete" data-kind="goal" data-id="${g.id}">Supprimer</button>` : ""}</div>
+  </form>`;
+}
+async function saveGoal(form) {
+  const fd = new FormData(form), id = form.dataset.id || null, btn = form.querySelector("[type=submit]");
+  const data = { name: String(fd.get("name")).trim(), target: num(fd.get("target")), date: String(fd.get("date") || "") || null, accounts: fd.getAll("acc").map(String), profile };
+  btn.disabled = true; btn.textContent = "Enregistrement…";
+  try {
+    if (id) { const { id: _d, ...old } = R.goals.find((x) => x.id === id) || {}; await db.collection("goals").doc(id).set({ ...old, ...data, profile: old.profile || profile, updatedAt: new Date().toISOString() }); }
+    else await db.collection("goals").add({ ...data, createdAt: new Date().toISOString() });
+    closeSheet();
+  } catch (err) { showErr(err); btn.disabled = false; btn.textContent = "Enregistrer"; }
+}
+// projection du patrimoine net
+let proj = null;
+function projData(P, save, ret, years = 20) {
+  const liq0 = P.accRows.filter((a) => ["courant", "livret"].includes(a.type)).reduce((s, a) => s + a.value, 0);
+  const inv0 = P.accRows.filter((a) => !["courant", "livret"].includes(a.type)).reduce((s, a) => s + a.value, 0);
+  const now = new Date(), pts = [];
+  let liq = liq0, inv = inv0, put = 0;
+  for (let m = 0; m <= years * 12; m++) {
+    if (m) { liq *= 1 + 0.017 / 12; inv = inv * (1 + ret / 100 / 12) + save; put += save; }
+    if (m % 3 && m !== years * 12) continue;
+    const at = new Date(now.getFullYear(), now.getMonth() + m, 1);
+    let immo = 0, debt = 0;
+    for (const p of P.propRows) {
+      const share = (p.share ?? 100) / 100;
+      immo += (p.value || 0) * share * Math.pow(1.01, m / 12) + (p.m.apportLive || (p.m.apport && p.bought && new Date(p.bought) <= at ? p.m.apport : 0));
+      for (const l of p.loans) { const st = loanStatus(l), k = Math.min(paidMonths(l.start, at), l.months); debt += (k ? st.rows[k - 1].remaining : l.principal) * share; }
+    }
+    for (const l of P.otherLoans) { const k = Math.min(paidMonths(l.start, at), l.months); debt += k ? l.s.rows[k - 1].remaining : l.principal; }
+    pts.push({ m, t: at.getTime(), net: liq + inv + immo - debt, fin: liq + inv, put });
+  }
+  return pts;
+}
+function projChart(pts) {
+  const W = 320, H = 150, pad = 8, max = Math.max(...pts.map((p) => p.net)), min = Math.min(0, ...pts.map((p) => p.net));
+  const x = (i) => pad + (i / (pts.length - 1)) * (W - 2 * pad), y = (v) => H - 20 - ((v - min) / (max - min || 1)) * (H - 34);
+  const path = (k) => pts.map((p, i) => `${i ? "L" : "M"}${x(i).toFixed(1)},${y(p[k]).toFixed(1)}`).join("");
+  const marks = [5, 10, 20].map((yr) => { const i = pts.findIndex((p) => p.m === yr * 12); if (i < 0) return ""; return `<line x1="${x(i)}" x2="${x(i)}" y1="${y(pts[i].net)}" y2="${H - 20}" stroke="var(--line)" stroke-dasharray="3 3"/><circle cx="${x(i)}" cy="${y(pts[i].net)}" r="3.5" fill="var(--gold)"/><text x="${x(i)}" y="${H - 6}" text-anchor="middle">${yr} ans</text>`; }).join("");
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Projection du patrimoine net"><defs><linearGradient id="pg" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="var(--accent)" stop-opacity=".22"/><stop offset="1" stop-color="var(--accent)" stop-opacity="0"/></linearGradient></defs>
+    <path d="${path("net")}L${x(pts.length - 1)},${H - 20}L${x(0)},${H - 20}Z" fill="url(#pg)"/><path d="${path("net")}" fill="none" stroke="var(--accent)" stroke-width="2"/><path d="${path("fin")}" fill="none" stroke="var(--gold)" stroke-width="1.5" stroke-dasharray="4 3"/>${marks}</svg>`;
+}
+function projOut(P) {
+  const pts = projData(P, proj.save, proj.ret), at = (y) => pts.find((p) => p.m === y * 12);
+  return `${projChart(pts)}
+    <div class="note" style="margin:4px 0 8px"><span class="dot" style="display:inline-block;background:var(--accent)"></span> patrimoine net <span class="dot" style="display:inline-block;background:var(--gold);margin-left:8px"></span> épargne et placements seuls</div>
+    <div class="kv">${[5, 10, 20].map((y) => `<div><span>Dans ${y} ans (${new Date().getFullYear() + y})</span><span><b>${fE(at(y).net)}</b></span></div>`).join("")}
+    <div><span>dont versements cumulés sur 20 ans</span><span>${fE(at(20).put)}</span></div></div>`;
+}
+function projSection(P) {
+  if (!proj) { const av = avgSaving(); proj = { save: av && av.save > 0 ? Math.round(av.save / 50) * 50 : 300, ret: 5 }; }
+  const p20 = projData(P, proj.save, proj.ret).at(-1);
+  return `<details class="section fold" data-fold="proj" ${openFolds.has("proj") ? "open" : ""}><summary><span class="fold-t"><h2>Projection à 20 ans</h2><span class="note">${fE(proj.save)}/mois placés à ${fP(proj.ret, 1)}/an</span></span><b>${fE(p20.net)}</b></summary>
+    <div class="panel">
+      <label class="rng">Épargne placée par mois <b id="pv-save">${fE(proj.save)}</b><input type="range" id="proj-save" min="0" max="2000" step="50" value="${proj.save}"></label>
+      <label class="rng">Rendement moyen des placements <b id="pv-ret">${fP(proj.ret, 1)}</b><input type="range" id="proj-ret" min="0" max="9" step="0.5" value="${proj.ret}"></label>
+      <div id="proj-out">${projOut(P)}</div>
+      <p class="note">Hypothèses : livrets et comptes à 1,7 %/an, immobilier +1 %/an, crédits remboursés selon leur tableau d'amortissement, inflation non déduite. L'épargne par mois part de ta moyenne réelle du Budget.</p>
+    </div></details>`;
+}
+document.addEventListener("input", (e) => {
+  if (e.target.id !== "proj-save" && e.target.id !== "proj-ret") return;
+  proj[e.target.id === "proj-save" ? "save" : "ret"] = Number(e.target.value);
+  document.getElementById("pv-save").textContent = fE(proj.save); document.getElementById("pv-ret").textContent = fP(proj.ret, 1);
+  document.getElementById("proj-out").innerHTML = projOut(portfolio());
+});
+// fiscalité
+function taxSection(P) {
+  const PFU = 31.4, PS = 18.6, now = new Date();
+  const gain = (a) => a.hs.reduce((s, h) => s + h.qty * (h.price - h.pru), 0);
+  const peas = P.accRows.filter((a) => a.type === "pea"), ctos = P.accRows.filter((a) => a.type === "cto" || a.type === "crypto"), avs = P.accRows.filter((a) => a.type === "assurance_vie"), livs = P.accRows.filter((a) => a.type === "livret");
+  const ctoGain = ctos.reduce((s, a) => s + Math.max(0, gain(a)), 0), ctoTax = ctoGain * PFU / 100;
+  const livInt = livs.reduce((s, a) => s + a.value * ((a.rate ?? 1.7) / 100), 0);
+  const peaRow = (a) => {
+    if (!a.openedAt) return `<div><span>${esc(a.name)} <small class="note">${esc(a.institution || "")}</small></span><span class="note">date d'ouverture inconnue</span></div>`;
+    const five = new Date(a.openedAt); five.setFullYear(five.getFullYear() + 5);
+    const mo = Math.ceil((five - now) / (30.4 * 864e5));
+    return `<div><span>${esc(a.name)} <small class="note">${esc(a.institution || "")} · ouvert le ${new Date(a.openedAt).toLocaleDateString("fr-FR")}</small></span><span>${mo <= 0 ? '<b class="gain">5 ans atteints</b>' : `5 ans le ${five.toLocaleDateString("fr-FR")}<small class="note"> · ${mo} mois</small>`}</span></div>`;
+  };
+  const avRow = (a) => {
+    if (!a.openedAt) return `<div><span>${esc(a.name)}</span><span class="note">date d'ouverture inconnue</span></div>`;
+    const eight = new Date(a.openedAt); eight.setFullYear(eight.getFullYear() + 8);
+    return `<div><span>${esc(a.name)} <small class="note">ouvert le ${new Date(a.openedAt).toLocaleDateString("fr-FR")}</small></span><span>${eight <= now ? '<b class="gain">8 ans atteints</b>' : "8 ans le " + eight.toLocaleDateString("fr-FR")}</span></div>`;
+  };
+  return `<details class="section fold"><summary><span class="fold-t"><h2>Fiscalité</h2><span class="note">PEA, compte-titres, assurance-vie, livrets</span></span><b>${ctoTax ? fE(ctoTax) + "<small> si tu vends</small>" : "—"}</b></summary>
+    ${peas.length ? `<div class="panel kv"><div class="strong"><span>PEA : l'horloge des 5 ans</span><span></span></div>${peas.map(peaRow).join("")}
+      <div><span class="note">Avant 5 ans, un retrait clôture le PEA et les gains sont taxés à ${fP(PFU, 1)}. Après 5 ans, seuls les prélèvements sociaux (${fP(PS, 1)}) restent dus sur les gains.</span></div></div>` : ""}
+    ${ctos.length ? `<div class="panel kv"><div class="strong"><span>Compte-titres et crypto</span><span></span></div>
+      <div><span>Plus-values latentes</span><span class="${tone(ctoGain)}">${fE(ctoGain)}</span></div>
+      <div><span>Impôt si tu vendais tout aujourd'hui (flat tax ${fP(PFU, 1)})</span><span>${fE(ctoTax)}</span></div>
+      <div><span class="note">Les moins-values se déduisent des plus-values de l'année et des 10 années suivantes. Les cryptos sont exonérées sous 305 € de cessions par an.</span></div></div>` : ""}
+    ${avs.length ? `<div class="panel kv"><div class="strong"><span>Assurance-vie : l'horloge des 8 ans</span><span></span></div>${avs.map(avRow).join("")}
+      <div><span class="note">Après 8 ans, les gains retirés bénéficient d'un abattement de 4 600 € par an (9 200 € pour un couple marié ou pacsé).</span></div></div>` : ""}
+    ${livs.length ? `<div class="panel kv"><div class="strong"><span>Livrets réglementés</span><span></span></div>
+      <div><span>Intérêts estimés sur un an</span><span class="gain">${fE(livInt)}</span></div>
+      <div><span class="note">Livret A, LDDS et LEP : intérêts exonérés d'impôt et de prélèvements sociaux.</span></div></div>` : ""}
+    <p class="note">Repères généraux (règles 2026), pas un conseil fiscal personnalisé.</p></details>`;
+}
+
 /* ---------------- Formulaires ---------------- */
 const F = {
   tx: { title: "Opération", col: "tx", groups: [] },
+  goal: { title: "Objectif", col: "goals", groups: [] },
   account: { title: "Compte", col: "accounts", groups: [[null, [
     ["name", "Nom", "text", { full: 1, req: 1, ph: "PEA, Livret A…" }], ["type", "Type", ACCOUNT_TYPES], ["institution", "Établissement", "text"],
     ["cash", "Liquidités ou solde (€)", "number", { full: 1 }]]], ["Historique (facultatif)", [
@@ -1295,6 +1514,9 @@ document.addEventListener("click", async (e) => {
   if (act === "tx-edit") { const x = R.tx.find((y) => y.id === id); return x && openSheet({ html: sheetTx(x) }); }
   if (act === "tx-import") { bImport = null; return openSheet({ html: sheetImport() }); }
   if (act === "tx-import-run") return runImport(t);
+  if (act === "tx-caps") return openSheet({ html: sheetCaps(lastAvgs) });
+  if (act === "new-goal") { let pre = null; try { pre = t.dataset.preset ? JSON.parse(t.dataset.preset) : null; } catch { } return openSheet({ html: sheetGoal(pre) }); }
+  if (act === "edit-goal") { const g = R.goals.find((y) => y.id === id); return g && openSheet({ html: sheetGoal(g) }); }
   if (act === "open-account") openSheet({ type: "account", id, live: true });
   else if (act === "open-property") openSheet({ type: "property", id, live: true });
   else if (act === "monthly") openSheet({ html: sheetMonthly() });
@@ -1321,6 +1543,8 @@ document.addEventListener("submit", async (e) => {
   const form = e.target, kind = form.dataset.kind, id = form.dataset.id || null, parent = form.dataset.parent || null;
   if (kind === "monthly") return saveMonthly(form);
   if (kind === "tx") return saveTx(form);
+  if (kind === "caps") return saveCaps(form);
+  if (kind === "goal") return saveGoal(form);
   const data = readForm(form);
   if (kind === "holding") data.accountId = parent;
   if (kind === "loan") data.propertyId = parent;
