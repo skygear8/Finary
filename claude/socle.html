@@ -1328,7 +1328,7 @@ async function saveCaps(form) {
   } catch (err) { showErr(err); btn.disabled = false; btn.textContent = "Enregistrer"; }
 }
 // abonnements et prélèvements réguliers, repérés sur les 3 derniers mois
-const RECUR_RE = /assurance|axa|maif|macif|matmut|lolivier|bank|credit|pret|loyer|lintot|gestion|syndic|edf|engie|veolia|mutuelle|telecom|bouygues|free|sfr|orange|sosh|netflix|spotify|deezer|disney|canal|prime|icloud|apple|google|anthropic|openai|finary|basic.?fit|fitness/;
+const RECUR_RE = /sncf|navigo|transilien|ratp|mobilites|ile.de.france|ter normandie|assurance|axa|maif|macif|matmut|lolivier|bank|credit|pret|loyer|lintot|gestion|syndic|edf|engie|veolia|mutuelle|telecom|bouygues|free|sfr|orange|sosh|netflix|spotify|deezer|disney|canal|prime|icloud|apple|google|anthropic|openai|finary|basic.?fit|fitness/;
 function recurring(D, endMonth) {
   const from = shiftM(endMonth, -2);
   const yFrom = shiftM(endMonth, -11);
@@ -1393,6 +1393,21 @@ function avgSaving() {
   });
   return { save: s.reduce((a, x) => a + x.save, 0) / s.length, rest: s.reduce((a, x) => a + x.rest, 0) / s.length, out: s.reduce((a, x) => a + x.out, 0) / s.length, joint: solo ? s.reduce((a, x) => a + x.joint, 0) / s.length : null, n: months.length };
 }
+// charges fixes : paiements récurrents de tes comptes perso + ce que tu vires sur le joint (Foyer : récurrents de tous les comptes)
+function fixedCharges() {
+  const keep = bScope; bScope = "all"; const D = budgetData(); bScope = keep;
+  const now = new Date().toISOString().slice(0, 7), solo = profile === "nathan" || profile === "angelique";
+  const own = solo ? { ...D, tx: D.tx.filter((t) => t.accountId !== "joint") } : D;
+  const last = [...new Set(own.tx.map((t) => ym(t.date)))].filter((m) => m < now).sort().pop();
+  if (!last) return null;
+  // seulement les vraies charges : logement, abonnements, assurances, transport (pas les achats ou virements ponctuels)
+  const items = recurring(own, last).filter((r) => ["logement", "abos"].includes(r.c) || RECUR_RE.test(normL(r.label))).map((r) => ({ label: r.label, amt: r.perMonth }));
+  // virement au joint du dernier mois complet : c'est ton rythme actuel
+  const joint = solo ? D.tx.filter((t) => t.accountId === "joint" && ym(t.date) === last && t.amount > 0 && t.c === "interne" && whoOf(t) === profile).reduce((x, t) => x + t.amount, 0) : 0;
+  if (joint > 0) items.unshift({ label: "Virement sur le compte joint", amt: joint, joint: true });
+  const auto = items.reduce((x, i) => x + i.amt, 0), manual = num(setOf(profile).fixed) || 0;
+  return { items, auto, manual, total: manual || auto };
+}
 // objectifs : collection goals {profile, name, target, accounts[], date?}
 function goalsSection(P) {
   const goals = R.goals.filter((g) => profile === "foyer" || g.profile === profile || g.profile === "foyer");
@@ -1414,7 +1429,7 @@ function goalsSection(P) {
       ${goals.some((g) => g.kind === "immo") ? "" : `<button class="seg-b" data-act="goal-new-kind" data-kind="immo">+ Projet immobilier</button>`}
       </div>` + (goals.length ? "" : `<div class="seg" style="margin-top:6px">
       ${livA ? `<button class="seg-b" data-act="new-goal" data-preset='${esc(JSON.stringify({ name: "Livret A au plafond", target: 22950, accounts: [livA.id] }))}'>+ Livret A au plafond</button>` : ""}
-      ${av ? `<button class="seg-b" data-act="new-goal" data-preset='${esc(JSON.stringify({ name: "Réserve de 6 mois de dépenses", target: Math.round(av.out * 6 / 100) * 100, accounts: liq }))}'>+ Réserve de 6 mois</button>` : ""}</div>`);
+      ${av ? `<button class="seg-b" data-act="new-goal" data-preset='${esc(JSON.stringify({ name: "Réserve de 6 mois de charges fixes", target: Math.round((fixedCharges()?.total || av.out) * 6 / 100) * 100, accounts: liq }))}'>+ Réserve de 6 mois</button>` : ""}</div>`);
   if (profile === "sci") return "";
   return `<section class="section"><div class="section-head"><h2>Objectifs</h2>${S.writable ? `<button class="btn ghost sm" data-act="goal-choose">Ajouter</button>` : ""}</div>
     ${rows ? `<div class="panel goals">${rows}</div>` : `<div class="panel empty" style="padding:14px">Fixe-toi un cap : un montant à épargner, un patrimoine à atteindre ou un achat immobilier.${profile === "foyer" ? "<br>Les objectifs créés ici sont communs au foyer." : ""}</div>`}${S.writable ? sugg : ""}</section>`;
@@ -1797,6 +1812,10 @@ function fireSection(P) {
     <p class="note" style="margin-top:6px">Règle des 4 % : un capital de 25 fois tes dépenses annuelles permet d'en retirer 4 % par an sans l'épuiser sur 30 ans. Rendement réel supposé : 3 %/an (5 % moins 2 % d'inflation), montants en euros d'aujourd'hui. Pour Nathan ou Angélique, les dépenses = comptes perso + versements sur le compte joint ; pour le Foyer, tout le joint.</p></details>`;
 }
 document.addEventListener("change", async (e) => {
+  if (e.target.id !== "fixed-amt") return;
+  openFolds.add("health"); try { await saveSet(profile, { fixed: Math.max(0, Math.round(num(e.target.value))) || null }); } catch (err) { showErr(err); }
+});
+document.addEventListener("change", async (e) => {
   if (e.target.id !== "fire-birth") return;
   const y = Math.round(num(e.target.value));
   if (y > 1900 && y < 2030) { openFolds.add("fire"); try { await saveSet(profile, { birthYear: y }); } catch (err) { showErr(err); } }
@@ -1946,7 +1965,7 @@ const householdIncome = () => { // salaires moyens nets du foyer sur les mois co
 function wealthCalc(g, P) {
   const cur = g.basis === "net" ? P.net : finWealth(P), av = avgSaving(), save = Math.max(0, av?.save || 0), ret = g.ret || 5;
   const m0 = monthsTo(cur, g.target, save, ret), m200 = monthsTo(cur, g.target, save + 200, ret);
-  const liq = P.accRows.filter((a) => ["courant", "livret"].includes(a.type)).reduce((s, a) => s + a.value, 0), reserve = av ? av.out * 6 : 0, excess = Math.max(0, liq - reserve - 1000);
+  const liq = P.accRows.filter((a) => ["courant", "livret"].includes(a.type)).reduce((s, a) => s + a.value, 0), reserve = av ? (fixedCharges()?.total || av.out) * 6 : 0, excess = Math.max(0, liq - reserve - 1000);
   const mExcess = excess > 0 ? monthsTo(cur + excess * 0, g.target, save, ret) : null;
   // placer l'excédent de liquidités (1,7 %) au rendement des placements
   const mInvest = excess > 0 ? (() => { let v = cur - excess, l = excess, rr = ret / 1200, rl = 0.017 / 12; for (let m = 0; m <= 1200; m++) { if (v + l >= g.target) return m; v = v * (1 + rr) + save; l *= 1 + rl; } return null; })() : null;
@@ -2142,7 +2161,8 @@ function passiveSection(P) {
 // ---- santé financière (avec l'épargne de précaution) ----
 function healthCalc(P) {
   const av = avgSaving(); if (!av || !(av.out > 0)) return null;
-  const liq = P.accRows.filter((a) => ["courant", "livret"].includes(a.type)).reduce((s, a) => s + a.value, 0), months = liq / av.out;
+  const fx = fixedCharges(), base = fx && fx.total > 0 ? fx.total : av.out;
+  const liq = P.accRows.filter((a) => ["courant", "livret"].includes(a.type)).reduce((s, a) => s + a.value, 0), months = liq / base;
   const inc = av.out + av.rest, rate = inc > 0 ? (av.rest / inc) * 100 : 0;
   const loans = [...P.propRows.flatMap((p) => p.loans.map((l) => loanStatus(l).pmtAll * ((p.share ?? 100) / 100))), ...P.otherLoans.map((l) => l.s.pmtAll)].reduce((s, x) => s + x, 0);
   const debtR = inc > 0 ? (loans / inc) * 100 : 0;
@@ -2151,14 +2171,14 @@ function healthCalc(P) {
   const fb = fr.reduce((s, x) => s + x.a.value, 0), fee = fb ? (fr.reduce((s, x) => s + x.f.total, 0) / fb) * 100 : null;
   const parts = [
     { k: "Taux d'épargne", v: `${fP(rate, 0)}`, pts: Math.max(0, Math.min(25, (rate / 20) * 25)), max: 25, tip: `Vise 20 % : mets ${fE(Math.max(0, inc * 0.2 - av.rest))} de plus de côté par mois.` },
-    { k: "Épargne de précaution", v: `${String(Math.round(months * 10) / 10).replace(".", ",")} mois`, pts: Math.max(0, Math.min(25, (months / 6) * 25)), max: 25, tone: months >= 6 ? "gain" : months >= 3 ? "warn" : "loss", tip: `Vise 6 mois de dépenses (${fE(av.out * 6)}) sur tes comptes et livrets : il manque ${fE(Math.max(0, av.out * 6 - liq))}.` },
+    { k: "Épargne de précaution", v: `${String(Math.round(months * 10) / 10).replace(".", ",")} mois`, pts: Math.max(0, Math.min(25, (months / 6) * 25)), max: 25, tone: months >= 6 ? "gain" : months >= 3 ? "warn" : "loss", tip: `Vise 6 mois de charges fixes (${fE(base * 6)}) sur tes comptes et livrets : il manque ${fE(Math.max(0, base * 6 - liq))}.` },
     { k: "Endettement", v: fP(debtR, 0), pts: debtR <= 35 ? 15 : Math.max(0, 15 - (debtR - 35)), max: 15, tip: "Garde tes mensualités sous 35 % de tes revenus." },
     { k: "Diversification", v: `${fP(top, 0)} sur une seule poche`, pts: top <= 50 ? 20 : Math.max(0, 20 - (top - 50) * 0.5), max: 20, tip: "Aucune poche ne devrait dépasser la moitié de ton patrimoine." },
     { k: "Frais", v: fee != null ? fP(fee, 2) + "/an" : "—", pts: fee == null ? 10 : fee <= 0.5 ? 15 : fee <= 1 ? 10 : fee <= 1.5 ? 5 : 0, max: 15, tip: "Privilégie les ETF et les enveloppes à frais bas (moins de 0,5 %/an)." },
   ];
   const score = Math.round(parts.reduce((s, p) => s + p.pts, 0));
   const worst = [...parts].sort((a, b) => a.pts / a.max - b.pts / b.max)[0];
-  return { score, parts, worst, months, liq, out: av.out, joint: av.joint };
+  return { score, parts, worst, months, liq, out: base, fx, joint: av.joint };
 }
 function healthSection(P) {
   if (profile === "sci") return "";
@@ -2167,7 +2187,12 @@ function healthSection(P) {
   return `<details class="section fold" data-fold="health" ${openFolds.has("health") ? "open" : ""}><summary><span class="fold-t"><h2>Santé financière</h2><span class="note">épargne de précaution : <b class="${h.months >= 6 ? "gain" : h.months >= 3 ? "warn" : "loss"}">${String(Math.round(h.months * 10) / 10).replace(".", ",")} mois</b></span></span><b style="color:${col}">${h.score}<small>/100</small></b></summary>
     <div class="panel kv">${h.parts.map((p) => `<div><span>${p.k}<small class="note"> · ${p.v}</small><span class="bar" style="display:block;margin-top:5px"><i style="width:${((p.pts / p.max) * 100).toFixed(0)}%;background:${p.pts / p.max >= 0.75 ? "var(--gain)" : p.pts / p.max >= 0.4 ? "#d9822b" : "var(--loss)"}"></i></span></span><span>${Math.round(p.pts)}/${p.max}</span></div>`).join("")}
       <div class="strong"><span>Le levier le plus utile : ${h.worst.k.toLowerCase()}</span><span></span></div><div><span class="note">${h.worst.tip}</span></div></div>
-    <p class="note" style="margin-top:6px">Épargne de précaution = comptes courants et livrets (${fE(h.liq)}) divisés par tes dépenses moyennes (${fE(h.out)}/mois${h.joint != null ? `, dont ${fE(h.joint)} versés sur le compte joint` : ""}). Vert à partir de 6 mois, orange entre 3 et 6, rouge en dessous.</p></details>`;
+    ${h.fx ? `<div class="panel kv" style="margin-top:10px">
+      <div class="strong"><span>Charges fixes par mois</span><span>${fE(h.out)}</span></div>
+      ${h.fx.items.map((i) => `<div><span>${esc(i.label)}</span><span>${fE(i.amt)}</span></div>`).join("")}
+      <div><span>${h.fx.manual ? `Montant saisi (détecté : ${fE(h.fx.auto)})` : "Corriger le montant"}</span><span><input class="inl" id="fixed-amt" inputmode="decimal" placeholder="${Math.round(h.fx.auto)}" value="${h.fx.manual || ""}" ${S.writable ? "" : "disabled"}> €</span></div>
+    </div>` : ""}
+    <p class="note" style="margin-top:6px">Épargne de précaution = comptes courants et livrets (${fE(h.liq)}) divisés par tes charges fixes (${fE(h.out)}/mois) : paiements récurrents de tes comptes${h.fx?.items.some((i) => i.joint) ? " et ce que tu vires sur le compte joint" : ""}, sans les courses, sorties et achats ponctuels. Laisse le champ vide pour reprendre le calcul automatique. Vert à partir de 6 mois, orange entre 3 et 6, rouge en dessous.</p></details>`;
 }
 
 // ---- simulateur d'achat ----
