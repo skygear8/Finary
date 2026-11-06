@@ -288,7 +288,7 @@ function propertyMetrics(p, loans) {
 const S = { accounts: [], holdings: [], properties: [], loans: [], snapshots: [], flows: [], ready: false, writable: true };
 const COLS = ["accounts", "holdings", "properties", "loans", "snapshots", "flows"];
 const isInvestType = (t) => !["courant", "livret"].includes(t);
-let histRange = "all";
+let histRange = "all", histSeries = "net";
 let db = null, tab = "synthese", sheet = null;
 
 function portfolio() {
@@ -350,12 +350,13 @@ function viewSynthese(P) {
       <button class="btn" data-act="new-account">Ajouter un compte</button> <button class="btn ghost" data-act="new-property">Ajouter un bien</button></div>`;
   const rental = P.propRows.filter((p) => p.type !== "residence_principale");
   const cf = rental.reduce((s, p) => s + p.m.myCashflow, 0);
-  const snaps = S.snapshots.filter((s) => /^\d{4}-\d{2}-\d{2}$/.test(s.id)).sort((a, b) => a.id.localeCompare(b.id));
-  const allHist = snaps.map((s) => ({ x: new Date(s.id).getTime(), y: s.assets - s.debts }));
-  const first = allHist[0], delta = first ? P.net - first.y : 0;
+  const allSnaps = S.snapshots.filter((s) => /^\d{4}-\d{2}-\d{2}$/.test(s.id)).sort((a, b) => a.id.localeCompare(b.id));
+  const snaps = histSeries === "inv" ? allSnaps.filter((s) => s.inv != null) : allSnaps.filter((s) => s.assets != null);
+  const allHist = snaps.map((s) => ({ x: new Date(s.id).getTime(), y: histSeries === "inv" ? s.inv : s.assets - s.debts }));
+  const netSnaps = allSnaps.filter((s) => s.assets != null), first = netSnaps.length ? { x: new Date(netSnaps[0].id).getTime(), y: netSnaps[0].assets - netSnaps[0].debts } : null, delta = first ? P.net - first.y : 0;
   const days = { "1m": 31, "3m": 92, "1a": 366 }[histRange];
   const hist = days ? allHist.filter((p) => p.x >= Date.now() - days * 864e5) : allHist;
-  const dec = decomposition(P, snaps.length ? snaps[0] : null, hist.length ? snaps.find((s) => new Date(s.id).getTime() === hist[0].x) : null);
+  const dec = histSeries === "inv" ? null : decomposition(P, snaps.length ? snaps[0] : null, hist.length ? snaps.find((s) => new Date(s.id).getTime() === hist[0].x) : null);
   return `
   <section class="hero">
     <div class="eyebrow">Patrimoine net</div>
@@ -377,8 +378,9 @@ function viewSynthese(P) {
   </section>
   <section class="section">
     <div class="section-head"><h2>Évolution du patrimoine net</h2></div>
+    <div class="seg" role="tablist" aria-label="Série" style="margin-bottom:8px">${[["net", "Patrimoine net"], ["inv", "Placements"]].map(([k, l]) => `<button role="tab" class="seg-b" aria-selected="${histSeries === k}" data-series="${k}">${l}</button>`).join("")}</div>
     <div class="seg" role="tablist" aria-label="Période" style="margin-bottom:10px">${[["1m", "1 mois"], ["3m", "3 mois"], ["1a", "1 an"], ["all", "Tout"]].map(([k, l]) => `<button role="tab" class="seg-b" aria-selected="${histRange === k}" data-range="${k}">${l}</button>`).join("")}</div>
-    <div class="panel">${lineChart(hist, "Évolution du patrimoine net")}</div>
+    <div class="panel">${lineChart(hist, histSeries === "inv" ? "Évolution des placements" : "Évolution du patrimoine net")}${histSeries === "inv" ? `<p class="note" style="margin-top:6px">Valeur de tes placements (PEA, CTO, assurance-vie, épargne salariale), versements compris.</p>` : ""}</div>
     ${dec ? `<div class="panel kv" style="margin-top:10px">
       <div class="strong"><span>Variation depuis le ${dec.from}</span><span class="${tone(dec.total)}">${sg(dec.total)}</span></div>
       <div><span>Performance des placements</span><span class="${tone(dec.market)}">${sg(dec.market)}${dec.marketPct != null ? ` · ${dec.marketPct >= 0 ? "+" : ""}${fP(dec.marketPct, 1)}` : ""}</span></div>
@@ -437,7 +439,7 @@ const sg = (v) => (v >= 0 ? "+" : "−") + fE(Math.abs(v));
 // variation du net entre une photo et aujourd'hui, séparée entre marchés et épargne
 function decomposition(P, firstSnap, rangeSnap) {
   const base = rangeSnap || firstSnap;
-  if (!base || base.inv == null || base.id === new Date().toISOString().slice(0, 10)) return null;
+  if (!base || base.inv == null || base.assets == null || base.id === new Date().toISOString().slice(0, 10)) return null;
   const flows = S.flows.filter((f) => f.date > base.id).reduce((a, f) => a + (Number(f.amount) || 0), 0);
   const total = P.net - (base.assets - base.debts), market = P.inv - base.inv - flows;
   return { from: new Date(base.id).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" }), total, market, saved: total - market, flows,
@@ -830,6 +832,7 @@ document.addEventListener("click", async (e) => {
   const sb = e.target.closest("[data-env]"); if (sb) { env = sb.dataset.env; return render(); }
   const ps = e.target.closest("[data-possort]"); if (ps) { posSort = ps.dataset.possort; return render(); }
   const rg = e.target.closest("[data-range]"); if (rg) { histRange = rg.dataset.range; return render(); }
+  const se = e.target.closest("[data-series]"); if (se) { histSeries = se.dataset.series; return render(); }
   const t = e.target.closest("[data-tab],[data-act]"); if (!t) return;
   if (t.dataset.tab) return setTab(t.dataset.tab);
   const id = t.dataset.id, act = t.dataset.act;
