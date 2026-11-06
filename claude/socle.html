@@ -20,6 +20,7 @@
   --c-av: #6d5bd0;
   --c-crypto: #c98a12;
   --c-immo: #2f6fd6;
+  --c-es: #b4497e;
   --c-autre: #a3b1ad;
   --font-display: "Sora", ui-sans-serif, system-ui, sans-serif;
   --font-body: "Figtree", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
@@ -29,14 +30,14 @@
   :root:not([data-theme="light"]) {
     --bg: #0c1312; --surface: #141d1c; --sunk: #1b2624; --fg: #e4ecea; --muted: #93a6a1; --line: #24312f;
     --accent: #3cc4b2; --accent-ink: #062320; --gain: #4ade9b; --loss: #fb8b4b;
-    --c-liq: #8fa39e; --c-bourse: #3cc4b2; --c-av: #a395f2; --c-crypto: #e8b44a; --c-immo: #6fa1f2; --c-autre: #5d6f6b;
+    --c-liq: #8fa39e; --c-bourse: #3cc4b2; --c-av: #a395f2; --c-crypto: #e8b44a; --c-immo: #6fa1f2; --c-es: #e07fb0; --c-autre: #5d6f6b;
     color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
   --bg: #0c1312; --surface: #141d1c; --sunk: #1b2624; --fg: #e4ecea; --muted: #93a6a1; --line: #24312f;
   --accent: #3cc4b2; --accent-ink: #062320; --gain: #4ade9b; --loss: #fb8b4b;
-  --c-liq: #8fa39e; --c-bourse: #3cc4b2; --c-av: #a395f2; --c-crypto: #e8b44a; --c-immo: #6fa1f2; --c-autre: #5d6f6b;
+  --c-liq: #8fa39e; --c-bourse: #3cc4b2; --c-av: #a395f2; --c-crypto: #e8b44a; --c-immo: #6fa1f2; --c-es: #e07fb0; --c-autre: #5d6f6b;
   color-scheme: dark;
 }
 * { box-sizing: border-box; }
@@ -197,13 +198,14 @@ input, select {
 
 <script>
 /* ---------------- Référentiels ---------------- */
-const ACCOUNT_TYPES = { courant: "Compte courant", livret: "Livret / épargne", pea: "PEA", cto: "Compte-titres", assurance_vie: "Assurance-vie", per: "PER", crypto: "Crypto", autre: "Autre" };
+const ACCOUNT_TYPES = { courant: "Compte courant", livret: "Livret / épargne", pea: "PEA", cto: "Compte-titres", assurance_vie: "Assurance-vie", per: "PER", epargne_salariale: "Épargne salariale", crypto: "Crypto", autre: "Autre" };
 const ASSET_CLASSES = { action: "Action", etf: "ETF", fonds: "Fonds / OPCVM", obligation: "Obligation", crypto: "Crypto", fonds_euro: "Fonds euros", autre: "Autre" };
 const PROPERTY_TYPES = { residence_principale: "Résidence principale", locatif: "Locatif", secondaire: "Résidence secondaire", scpi: "SCPI" };
 const SLICES = [
   { key: "liq", label: "Liquidités", types: ["courant", "livret"] },
   { key: "bourse", label: "Bourse", types: ["pea", "cto"] },
   { key: "av", label: "Assurance-vie / PER", types: ["assurance_vie", "per"] },
+  { key: "es", label: "Épargne salariale", types: ["epargne_salariale"] },
   { key: "crypto", label: "Crypto", types: ["crypto"] },
   { key: "immo", label: "Immobilier", types: [] },
   { key: "autre", label: "Autre", types: ["autre"] },
@@ -449,11 +451,12 @@ const ENVELOPES = [
   { k: "assurance_vie", label: "Assurance-vie" },
   { k: "courant", label: "Compte courant" },
   { k: "livret", label: "Livrets" },
+  { k: "epargne_salariale", label: "Épargne salariale" },
   { k: "per", label: "PER" },
   { k: "crypto", label: "Crypto" },
   { k: "autre", label: "Autre" },
 ];
-const ALWAYS = ["all", "cto", "pea", "assurance_vie", "courant", "livret"];
+const ALWAYS = ["all", "cto", "pea", "assurance_vie", "epargne_salariale", "courant", "livret"];
 let env = "all";
 let posSort = "perf";
 
@@ -585,6 +588,7 @@ function sheetAccount(a) {
   return `
   <div class="sheet-head"><div><h2>${esc(a.name)}</h2><div class="note">${ACCOUNT_TYPES[a.type]}${a.institution ? " · " + esc(a.institution) : ""}</div></div><button class="x" data-act="close" aria-label="Fermer">×</button></div>
   <div class="grid2">${tile("Valeur", fE(a.value))}${tile("Liquidités", fE(a.cash))}${invest && a.hs.length ? tile("Investi (PRU)", fE(inv)) + tile("Plus-value latente", fE(pnl), inv ? fP((pnl / inv) * 100) : "", tone(pnl)) : ""}${(() => { const r = accountPerf(a); return r ? tile("Depuis le 31/12", sg(r.gain), r.pct != null ? (r.pct >= 0 ? "+" : "") + fP(r.pct, 1) + " hors versements" : "", tone(r.gain)) : ""; })()}</div>
+  ${a.pending ? `<div class="todo"><b>Opération en cours</b><span>${esc(a.pending)}</span></div>` : ""}
   ${invest ? `<section class="section"><div class="section-head"><h2>Positions</h2><button class="btn ghost" data-act="new-holding" data-id="${a.id}">Ajouter</button></div>
     <div class="panel list">${a.hs.map((h) => {
       const v = h.qty * h.price, g = h.qty * (h.price - h.pru), gp = h.pru ? ((h.price - h.pru) / h.pru) * 100 : 0;
