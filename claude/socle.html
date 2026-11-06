@@ -212,6 +212,11 @@ details.fold > summary::-webkit-details-marker { display: none; }
 .cal-day.ev small { font-size: 10px; font-weight: 500; color: var(--muted); }
 .txl:has(.cal-day.ev) { grid-template-columns: 42px minmax(0, 1fr); }
 .warn { color: #c46a12; font-weight: 600; }
+ol.tips { margin: 0; padding: 0 0 0 20px; display: grid; gap: 10px; line-height: 1.45; }
+.mbars { display: grid; grid-template-columns: repeat(12, 1fr); gap: 4px; height: 90px; align-items: end; }
+.mbars span { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; gap: 3px; }
+.mbars i { display: block; width: 100%; max-width: 18px; min-height: 2px; border-radius: 4px 4px 0 0; background: linear-gradient(180deg, var(--gold), var(--accent)); }
+.mbars small { font-size: 10px; color: var(--muted); }
 .kv .alert { background: color-mix(in srgb, var(--loss) 10%, transparent); border-radius: 8px; padding: 8px 10px; }
 .env, .env-cta { display: grid; gap: 8px; width: 100%; text-align: left; font: inherit; color: inherit; cursor: pointer; border: 1px solid var(--panel-border); }
 .env .gh { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; }
@@ -541,6 +546,7 @@ function viewSynthese(P) {
     ${tile("Plus-values latentes", fE(P.accRows.reduce((s, a) => s + a.hs.reduce((t, h) => t + h.qty * (h.price - h.pru), 0), 0)), "Bourse et crypto", tone(P.accRows.reduce((s, a) => s + a.hs.reduce((t, h) => t + h.qty * (h.price - h.pru), 0), 0)))}
   </div>
   <div class="section"><div class="panel monthly"><span><b>Mise à jour du mois</b><div class="note">${lastUpdateText()}</div></span><button class="btn" data-act="monthly">Mettre à jour</button></div></div>
+  ${healthSection(P)}
   ${goalsSection(P)}
   ${agendaSection(P)}
   <section class="section">
@@ -566,8 +572,10 @@ function viewSynthese(P) {
   ${rebalSection(P)}
   ${ytdTable(P)}
   ${costTable(P)}
+  ${passiveSection(P)}
   ${feesTable(P)}
-  ${taxSection(P)}`;
+  ${taxSection(P)}
+  ${taxIRSection(P)}`;
 }
 // ce que tu as mis (prix d'achat, PRU, apport) face à ce que ça vaut aujourd'hui
 function costTable(P) {
@@ -797,6 +805,7 @@ function viewImmo(P) {
   <section class="hero"><div class="eyebrow">${profile === "sci" ? "SCI, immeuble net de crédit" : "Immobilier, net de crédit"}</div><div class="big">${fE(v - d + P.partsVal)}</div>
     <div class="sub">${R.length ? `Valeur ${fE(v)} · restant dû ${fE(d)}` : ""}${R.length && P.partRows.length ? " · " : ""}${P.partRows.length ? `parts de SCI ${fE(P.partsVal)}` : ""}</div></section>
   ${parts}
+  ${sciSection(P)}
   ${R.length ? `<div class="grid2">${tile("Cash-flow locatif", fE(cf) + "<small style='font-size:12px;font-weight:500'> /mois</small>", "après crédit et charges", tone(cf))}${tile("Loyers bruts", fE(R.reduce((s, p) => s + p.m.rent, 0)), "par an")}</div>` : ""}
   <section class="section">
     <div class="panel list">${R.map((p) => `<button class="row" data-act="open-property" data-id="${p.id}">
@@ -1055,7 +1064,7 @@ function viewBudget() {
     ${tile("Taux d'épargne", rate != null ? fP(rate, 0) : "—", "part des revenus non dépensée", rate != null ? tone(rate) : "")}
   </div>
   <div class="section">${scopeSeg}</div>
-  <div class="section actions"><button class="btn ghost sm" data-act="report">Rapport du mois</button><button class="btn ghost sm" data-act="budget-settings">Réglages</button></div>
+  <div class="section actions"><button class="btn ghost sm" data-act="report">Rapport du mois</button><button class="btn ghost sm" data-act="year">Bilan de l'année</button><button class="btn ghost sm" data-act="budget-settings">Réglages</button></div>
   ${forecastSection(D, balRows)}
   ${envelopeSection(D)}
   <section class="section"><div class="section-head"><h2>Où part l'argent</h2><span class="total">${over ? `<span class="pill overp">${over} plafond${over > 1 ? "s" : ""} dépassé${over > 1 ? "s" : ""}</span> ` : ""}${fE(T.out)}</span></div>
@@ -1066,6 +1075,8 @@ function viewBudget() {
   ${compareSection(series, D)}
   ${recurringSection(D)}
   ${jointSection(D)}
+  ${challengesSection(D)}
+  ${costsSection(D)}
   <section class="section"><div class="section-head"><h2>12 derniers mois</h2><span class="note"><span class="dot" style="display:inline-block;background:var(--gold)"></span> revenus <span class="dot" style="display:inline-block;background:var(--accent);margin-left:6px"></span> dépenses</span></div>
     <div class="panel">${budgetBars(series)}</div></section>
   <section class="section"><h2>Comptes courants</h2><div class="panel list">${balRows.map(balRow).join("")}</div></section>
@@ -1318,9 +1329,10 @@ function avgSaving() {
 }
 // objectifs : collection goals {profile, name, target, accounts[], date?}
 function goalsSection(P) {
-  const goals = R.goals.filter((g) => profile === "foyer" || g.profile === profile);
+  const goals = R.goals.filter((g) => profile === "foyer" || g.profile === profile || g.profile === "foyer");
   const av = avgSaving(), pace = av ? Math.max(0, av.save) : 0;
   const rows = goals.map((g) => {
+    if (g.kind === "wealth" || g.kind === "immo") return goalRowX(g, P);
     const cur = P.accRows.filter((a) => (g.accounts || []).includes(a.id)).reduce((s, a) => s + a.value, 0);
     const pct = g.target ? Math.min(100, (cur / g.target) * 100) : 0, left = Math.max(0, g.target - cur);
     let eta = left <= 0 ? "Objectif atteint" : pace > 0 ? `au rythme actuel (${fE(pace)}/mois) : ${new Date(Date.now() + (left / pace) * 30.4 * 864e5).toLocaleDateString("fr-FR", { month: "long", year: "numeric" })}` : "épargne nette nulle ces derniers mois : pas d'estimation";
@@ -1331,11 +1343,15 @@ function goalsSection(P) {
   }).join("");
   const livA = P.accRows.find((a) => a.type === "livret" && /livret a/i.test(a.name));
   const liq = P.accRows.filter((a) => a.type === "livret").map((a) => a.id);
-  const sugg = goals.length ? "" : `<div class="seg" style="margin-top:2px">
+  const sugg = `<div class="seg" style="margin-top:8px;flex-wrap:wrap">
+      ${goals.some((g) => g.kind === "wealth") ? "" : `<button class="seg-b" data-act="goal-new-kind" data-kind="wealth">+ 1 M€ de patrimoine</button>`}
+      ${goals.some((g) => g.kind === "immo") ? "" : `<button class="seg-b" data-act="goal-new-kind" data-kind="immo">+ Projet immobilier</button>`}
+      <button class="seg-b" data-act="sim">Et si j'achète ?</button><button class="seg-b" data-act="year">Bilan de l'année</button></div>` + (goals.length ? "" : `<div class="seg" style="margin-top:6px">
       ${livA ? `<button class="seg-b" data-act="new-goal" data-preset='${esc(JSON.stringify({ name: "Livret A au plafond", target: 22950, accounts: [livA.id] }))}'>+ Livret A au plafond</button>` : ""}
-      ${av ? `<button class="seg-b" data-act="new-goal" data-preset='${esc(JSON.stringify({ name: "Réserve de 6 mois de dépenses", target: Math.round(av.out * 6 / 100) * 100, accounts: liq }))}'>+ Réserve de 6 mois</button>` : ""}</div>`;
-  return `<section class="section"><div class="section-head"><h2>Objectifs</h2>${S.writable && profile !== "foyer" ? `<button class="btn ghost sm" data-act="new-goal">Ajouter</button>` : ""}</div>
-    ${rows ? `<div class="panel goals">${rows}</div>` : `<div class="panel empty" style="padding:14px">Fixe-toi un cap : un montant à atteindre sur un ou plusieurs comptes.${profile === "foyer" ? "<br>Choisis Nathan ou Angélique pour en ajouter." : ""}</div>`}${profile !== "foyer" ? sugg : ""}</section>`;
+      ${av ? `<button class="seg-b" data-act="new-goal" data-preset='${esc(JSON.stringify({ name: "Réserve de 6 mois de dépenses", target: Math.round(av.out * 6 / 100) * 100, accounts: liq }))}'>+ Réserve de 6 mois</button>` : ""}</div>`);
+  if (profile === "sci") return "";
+  return `<section class="section"><div class="section-head"><h2>Objectifs</h2>${S.writable ? `<button class="btn ghost sm" data-act="goal-choose">Ajouter</button>` : ""}</div>
+    ${rows ? `<div class="panel goals">${rows}</div>` : `<div class="panel empty" style="padding:14px">Fixe-toi un cap : un montant à épargner, un patrimoine à atteindre ou un achat immobilier.${profile === "foyer" ? "<br>Les objectifs créés ici sont communs au foyer." : ""}</div>`}${S.writable ? sugg : ""}</section>`;
 }
 function sheetGoal(g) {
   const d = g || {};
@@ -1843,6 +1859,406 @@ async function saveAlloc(form) {
   try { await saveSet(profile, { alloc: o }); openFolds.add("rebal"); closeSheet(); } catch (err) { showErr(err); btn.disabled = false; btn.textContent = "Enregistrer"; }
 }
 
+/* ---------------- Objectifs avancés (patrimoine, immobilier), dividendes, simulateur, santé financière, coûts, défis, impôt, SCI, bilan ---------------- */
+// taux immobiliers moyens du jour : doc settings "rates" (mis à jour par Claude), sinon valeurs de novembre 2026
+const RATES_DEF = { date: "2026-11-04", src: "Pretto, baromètre de novembre 2026", t15: 3.56, t20: 3.76, t25: 3.85, best20: 3.47 };
+const ratesNow = () => ({ ...RATES_DEF, ...setOf("rates") });
+const rateFor = (y) => { const r = ratesNow(); return y <= 15 ? r.t15 : y <= 20 ? r.t20 : r.t25; };
+const pmtOf = (P, ratePct, months) => monthlyPayment(P, ratePct, months);
+const pvOf = (pay, ratePct, months) => { const r = ratePct / 1200; return r ? (pay * (1 - Math.pow(1 + r, -months))) / r : pay * months; };
+// patrimoine financier : comptes + parts de société
+const finWealth = (P) => P.accRows.reduce((s, a) => s + a.value, 0) + Math.max(0, P.partsVal || 0);
+function monthsTo(cur, target, save, ratePct) { const r = ratePct / 1200; let v = cur; for (let m = 0; m <= 1200; m++) { if (v >= target) return m; v = v * (1 + r) + save; } return null; }
+function needMonthly(cur, target, months, ratePct) { const r = ratePct / 1200, g = Math.pow(1 + r, months); return Math.max(0, r ? ((target - cur * g) * r) / (g - 1) : (target - cur) / months); }
+const inMonths = (m) => m == null ? "dans plus de 100 ans" : (() => { const d = new Date(); d.setMonth(d.getMonth() + m); return `${d.toLocaleDateString("fr-FR", { month: "long", year: "numeric" })} (${m < 24 ? m + " mois" : Math.round(m / 12) + " ans"})`; })();
+const householdIncome = () => { // salaires moyens nets du foyer sur les mois complets connus
+  return withProfile("foyer", () => { const D = withScope("all", budgetData), now = curMonth(); const ms = [...new Set(D.tx.map((t) => ym(t.date)))].filter((m) => m < now).sort().slice(-3);
+    return ms.length ? ms.reduce((s, m) => s + D.tx.filter((t) => ym(t.date) === m && t.c === "salaire").reduce((a, t) => a + t.amount, 0), 0) / ms.length : 0; });
+};
+
+// ---- objectif patrimoine ----
+function wealthCalc(g, P) {
+  const cur = g.basis === "net" ? P.net : finWealth(P), av = avgSaving(), save = Math.max(0, av?.save || 0), ret = g.ret || 5;
+  const m0 = monthsTo(cur, g.target, save, ret), m200 = monthsTo(cur, g.target, save + 200, ret);
+  const liq = P.accRows.filter((a) => ["courant", "livret"].includes(a.type)).reduce((s, a) => s + a.value, 0), reserve = av ? av.out * 6 : 0, excess = Math.max(0, liq - reserve - 1000);
+  const mExcess = excess > 0 ? monthsTo(cur + excess * 0, g.target, save, ret) : null;
+  // placer l'excédent de liquidités (1,7 %) au rendement des placements
+  const mInvest = excess > 0 ? (() => { let v = cur - excess, l = excess, rr = ret / 1200, rl = 0.017 / 12; for (let m = 0; m <= 1200; m++) { if (v + l >= g.target) return m; v = v * (1 + rr) + save; l *= 1 + rl; } return null; })() : null;
+  const mLiq = excess > 0 ? (() => { let v = cur - excess, l = excess, rr = ret / 1200, rl = 0.017 / 12; for (let m = 0; m <= 1200; m++) { if (v + l >= g.target) return m; v = v * (1 + rr) + save; l *= 1 + rl; } return null; })() : null;
+  const horizon = g.date ? Math.max(1, Math.round((new Date(g.date) - Date.now()) / (30.44 * 864e5))) : null;
+  return { cur, save, ret, m0, m200, excess, reserve, horizon, mExcess, mInvest, mLiq,
+    need: horizon ? [3, 5, 7].map((r) => [r, needMonthly(cur, g.target, horizon, r)]) : [10, 15, 20, 25].map((y) => [y, needMonthly(cur, g.target, y * 12, ret)]) };
+}
+function sheetWealthDetail(g) {
+  applyProfile(); const P = portfolio(), c = wealthCalc(g, P), pct = Math.min(100, (c.cur / g.target) * 100);
+  const feeRows = P.accRows.filter((a) => isInvestType(a.type) && a.value > 0).map((a) => ({ a, f: feesOf(a) })).filter((x) => x.f.known);
+  const feeBase = feeRows.reduce((s, x) => s + x.a.value, 0), feeRate = feeBase ? feeRows.reduce((s, x) => s + x.f.total, 0) / feeBase : 0;
+  const mFee = feeRate > 0.004 ? monthsTo(c.cur, g.target, c.save, c.ret + (feeRate - 0.003) * 100) : null;
+  const tips = [];
+  if (c.horizon) tips.push(`Pour y arriver d'ici ${new Date(g.date).toLocaleDateString("fr-FR", { month: "long", year: "numeric" })}, il faut placer <b>${fE(c.need[1][1])}/mois à 5 %</b> (${fE(c.need[0][1])} à 3 %, ${fE(c.need[2][1])} à 7 %). Aujourd'hui, ton épargne nette est de ${fE(c.save)}/mois.`);
+  else tips.push(`Au rythme actuel (${fE(c.save)}/mois à ${fP(c.ret, 0)}/an), tu l'atteins en <b>${inMonths(c.m0)}</b>.`);
+  if (c.m200 != null && c.m0 != null && c.m0 - c.m200 >= 6) tips.push(`<b>+200 €/mois</b> d'épargne te fait gagner ${String(Math.round((c.m0 - c.m200) / 12 * 10) / 10).replace(".", ",")} ans (objectif en ${inMonths(c.m200)}).`);
+  if (c.excess > 500) tips.push(`Tu as <b>${fE(c.excess)}</b> de liquidités au-delà de 6 mois de dépenses (${fE(c.reserve)}). Placés en ETF monde dans le PEA plutôt que sur un livret à 1,7 %, ils travaillent pour l'objectif.`);
+  if (mFee != null && c.m0 != null && c.m0 - mFee >= 6) tips.push(`Tes frais moyens sont de ${fP(feeRate * 100, 2)}/an. Les ramener vers 0,3 % (ETF) fait gagner environ ${String(Math.round((c.m0 - mFee) / 12 * 10) / 10).replace(".", ",")} ans.`);
+  tips.push(`Ordre conseillé : épargne de précaution (6 mois), puis le PEA (jusqu'à 150 000 € de versements, gains exonérés d'impôt après 5 ans), puis l'assurance-vie, puis le compte-titres.`);
+  if (c.ret < 6) tips.push(`Une poche actions mondiale vise plutôt 6 à 7 %/an sur 20 ans, avec des baisses temporaires de 30 % ou plus à accepter en route.`);
+  return `<div class="sheet-head"><h2>${esc(g.name)}</h2><div class="head-btns"><button class="btn ghost sm" data-act="goal-edit-form" data-id="${g.id}">Modifier</button><button class="x" data-act="close" aria-label="Fermer">×</button></div></div>
+    <div class="panel kv"><div class="strong"><span>${g.basis === "net" ? "Patrimoine net" : "Patrimoine financier"} aujourd'hui</span><span>${fE(c.cur)} / ${fE(g.target)}</span></div>
+      <div><span><span class="bar" style="display:block;margin:4px 0"><i style="width:${pct.toFixed(1)}%"></i></span></span><span>${fP(pct, 1)}</span></div>
+      <div><span>Au rythme actuel</span><span>${inMonths(c.m0)}</span></div>
+      ${(c.horizon ? c.need.map(([r, v]) => `<div><span>Effort mensuel à ${r} %/an</span><b>${fE(v)}</b></div>`) : c.need.map(([y, v]) => `<div><span>Pour y être dans ${y} ans (${new Date().getFullYear() + y})</span><b>${fE(v)}/mois</b></div>`)).join("")}</div>
+    <div class="section-head" style="margin-top:14px"><h2 style="font-size:16px">Comment l'atteindre</h2></div>
+    <ol class="tips">${tips.map((t) => `<li>${t}</li>`).join("")}</ol>
+    <p class="note">Rendement supposé ${fP(c.ret, 0)}/an (modifiable), avant impôts et inflation. Épargne mensuelle = ta moyenne réelle du Budget. Patrimoine financier = tous tes comptes, plus tes parts de SCI.</p>`;
+}
+
+// ---- objectif achat immobilier + PTZ ----
+const PTZ = {
+  ceil: { A: 49000, B1: 34500, B2: 31500, C: 28500 }, // RFR max pour 1 personne, × coefficient familial
+  tr: { A: [25000, 31000, 37000], B1: [21500, 26000, 30000], B2: [18000, 22500, 27000], C: [15000, 19500, 24000] }, // tranches 1 à 3 (RFR ÷ coefficient), au-delà tranche 4
+  coef: [1, 1.5, 1.8, 2.1, 2.4, 2.7, 3, 3.3],
+  cost: { A: [150000, 225000, 270000, 315000, 360000], B1: [135000, 202500, 243000, 283500, 324000], B2: [110000, 165000, 198000, 231000, 264000], C: [100000, 150000, 180000, 210000, 240000] },
+  q: { neuf_collectif: [50, 40, 40, 20], neuf_maison: [30, 20, 20, 10], ancien_travaux: [50, 40, 40, 20] },
+  dur: [[10, 15], [8, 12], [2, 13], [0, 10]], // [différé, remboursement] en années, par tranche
+};
+const IMMO_KINDS = { ancien: "Ancien", ancien_travaux: "Ancien avec gros travaux (≥ 25 %)", neuf_collectif: "Neuf, appartement", neuf_maison: "Neuf, maison" };
+function ptzCalc(g) {
+  const n = Math.max(1, Math.min(8, Math.round(g.persons || 2))), co = PTZ.coef[n - 1], zone = g.zone || "B1", rfr = g.rfr || 0, why = [];
+  if (!g.primo) why.push("il faut ne pas avoir été propriétaire de sa résidence principale dans les 2 dernières années");
+  if (g.kind === "ancien") why.push("l'ancien sans gros travaux n'est pas finançable");
+  if (g.kind === "ancien_travaux" && !["B2", "C"].includes(zone)) why.push("l'ancien avec travaux n'est finançable qu'en zones B2 et C");
+  if (g.kind === "ancien_travaux" && (g.works || 0) < 0.25 * ((g.price || 0) + (g.works || 0))) why.push("les travaux doivent faire au moins 25 % du coût total");
+  if (!rfr) why.push("renseigne ton revenu fiscal de référence N-2 pour vérifier les plafonds");
+  else if (rfr > PTZ.ceil[zone] * co) why.push(`revenu fiscal de référence au-dessus du plafond (${fE(PTZ.ceil[zone] * co)} en zone ${zone} pour ${n} personne${n > 1 ? "s" : ""})`);
+  const q = rfr / co, t = q <= PTZ.tr[zone][0] ? 0 : q <= PTZ.tr[zone][1] ? 1 : q <= PTZ.tr[zone][2] ? 2 : 3;
+  const base = Math.min((g.price || 0) + (g.works || 0), PTZ.cost[zone][Math.min(5, n) - 1]);
+  const quot = (PTZ.q[g.kind] || [0, 0, 0, 0])[t], amount = why.length ? 0 : Math.round((base * quot) / 100);
+  const [diff, remb] = PTZ.dur[t];
+  return { ok: !why.length, why, tranche: t + 1, quot, base, amount, diff, remb, monthly: amount ? amount / (remb * 12) : 0, zone, n };
+}
+function immoCalc(g, P) {
+  const years = g.years || 20, rate = g.rate || rateFor(years), ins = g.ins ?? 0.3;
+  const notaryPct = g.kind && g.kind.startsWith("neuf") ? 2.5 : 7.5, notary = Math.round(((g.price || 0) * notaryPct) / 100);
+  const ptz = ptzCalc(g), apport = g.apport || 0;
+  let loan = Math.max(0, (g.price || 0) + (g.works || 0) + notary - apport - ptz.amount);
+  const guarantee = Math.round(loan * 0.012 + 800); loan += guarantee; // caution + frais de dossier, financés
+  const pay = pmtOf(loan, rate, years * 12), insM = (loan * ins) / 1200, total1 = pay + insM + (ptz.diff === 0 ? ptz.monthly : 0), totalMax = pay + insM + ptz.monthly;
+  const income = g.income || householdIncome(), ratio = income ? (totalMax / income) * 100 : null;
+  const capPay = income * 0.35 - insM - (ptz.amount ? ptz.monthly : 0), capacity = Math.max(0, pvOf(capPay, rate, years * 12));
+  const interest = pay * years * 12 - loan, saved = P ? P.accRows.filter((a) => (g.accounts || []).includes(a.id)).reduce((s, a) => s + a.value, 0) : 0;
+  const minApport = notary + guarantee; // les banques veulent souvent au moins les frais
+  return { years, rate, ins, notary, notaryPct, ptz, loan, guarantee, pay, insM, total1, totalMax, income, ratio, capacity, interest, totalCost: interest + insM * years * 12, saved, minApport, apport };
+}
+function sheetImmoDetail(g0) {
+  const g = immoG(g0); applyProfile(); const P = portfolio(), c = immoCalc(g, P), r = ratesNow(), pz = c.ptz, av = avgSaving();
+  const left = Math.max(0, c.apport - c.saved), mLeft = av && av.save > 0 ? Math.ceil(left / av.save) : null;
+  return `<div class="sheet-head"><h2>${esc(g.name)}</h2><div class="head-btns"><button class="btn ghost sm" data-act="goal-edit-form" data-id="${g.id}">Modifier</button><button class="x" data-act="close" aria-label="Fermer">×</button></div></div>
+    <div class="grid2">${tile("Mensualité", fE(c.total1), `crédit ${fE(c.pay)} + assurance ${fE(c.insM)}${pz.amount && pz.diff === 0 ? ` + PTZ ${fE(pz.monthly)}` : ""}`)}${tile("Taux d'endettement", c.ratio != null ? fP(c.ratio, 0) : "—", c.income ? `sur ${fE(c.income)} de revenus/mois · max 35 %` : "revenus à renseigner", c.ratio != null ? (c.ratio <= 35 ? "gain" : "loss") : "")}</div>
+    <div class="panel kv" style="margin-top:10px"><div class="strong"><span>Plan de financement</span><span></span></div>
+      <div><span>Prix${g.works ? " + travaux" : ""}</span><span>${fE((g.price || 0) + (g.works || 0))}</span></div>
+      <div><span>Frais de notaire (≈ ${String(c.notaryPct).replace(".", ",")} %)</span><span>${fE(c.notary)}</span></div>
+      <div><span>Garantie et dossier (≈)</span><span>${fE(c.guarantee)}</span></div>
+      <div><span>Apport</span><span>− ${fE(c.apport)}</span></div>
+      <div><span>Prêt à taux zéro</span><span>${pz.amount ? "− " + fE(pz.amount) : "non éligible"}</span></div>
+      <div class="strong"><span>Prêt principal sur ${c.years} ans à ${fP(c.rate, 2)}</span><span>${fE(c.loan)}</span></div>
+      <div><span>Coût total des intérêts et de l'assurance</span><span class="loss">${fE(c.totalCost)}</span></div>
+      <div><span>Capacité d'emprunt à 35 % <small class="note">mêmes durée et taux</small></span><span>${fE(c.capacity)}</span></div></div>
+    <div class="panel kv" style="margin-top:10px"><div class="strong"><span>Taux du jour (${esc(r.src)})</span><span></span></div>
+      <div><span>15 ans</span><span>${fP(r.t15, 2)}</span></div><div><span>20 ans</span><span>${fP(r.t20, 2)} <small class="note">· meilleurs dossiers ${fP(r.best20, 2)}</small></span></div><div><span>25 ans</span><span>${fP(r.t25, 2)}</span></div>
+      <div><span class="note">Taux moyens hors assurance, relevés le ${new Date(r.date).toLocaleDateString("fr-FR")}. ${g.rate ? "Tu as fixé ton propre taux." : "Ta simulation utilise le taux moyen de ta durée."}</span></div></div>
+    <div class="panel kv" style="margin-top:10px"><div class="strong"><span>Prêt à taux zéro (PTZ)</span><span class="${pz.ok ? "gain" : "loss"}">${pz.ok ? "éligible" : "non éligible"}</span></div>
+      ${pz.ok ? `<div><span>Tranche ${pz.tranche} · zone ${pz.zone} · ${pz.n} pers.</span><span>${pz.quot} % de ${fE(pz.base)}</span></div>
+      <div><span>Montant</span><b>${fE(pz.amount)}</b></div>
+      <div><span>Remboursement</span><span>${pz.diff ? `${pz.diff} ans sans rien payer, puis ` : ""}${fE(pz.monthly)}/mois pendant ${pz.remb} ans</span></div>` : pz.why.map((w) => `<div><span class="note">• ${w}</span></div>`).join("")}
+      <div><span class="note">Règles 2026 (décret 2024-304 modifié) : résidence principale, primo-accédant, neuf partout, ancien avec ≥ 25 % de travaux en zones B2/C, revenus N-2. Le PTZ est prévu jusqu'à fin 2027. Tes parts de SCI locative ne t'empêchent pas d'être primo-accédant. Rouen est en zone B1 (à vérifier pour la commune visée).</span></div></div>
+    ${g.accounts?.length ? `<div class="panel kv" style="margin-top:10px"><div class="strong"><span>Apport mis de côté</span><span>${fE(c.saved)} / ${fE(c.apport)}</span></div>
+      <div><span>Reste à épargner</span><span>${left ? fE(left) + (mLeft != null ? ` · ${inMonths(mLeft)} au rythme actuel` : "") : "apport réuni"}</span></div>
+      <div><span class="note">Les banques demandent souvent un apport couvrant au moins les frais (≈ ${fE(c.minApport)}).</span></div></div>` : ""}
+    <p class="note" style="margin-top:8px">Simulation indicative : frais de notaire et de garantie estimés, assurance à ${fP(c.ins, 2)} du capital par an. À confirmer avec un courtier.</p>`;
+}
+
+// ---- formulaires d'objectifs ----
+function sheetGoalChooser() {
+  return `<div class="sheet-head"><h2>Nouvel objectif</h2><button class="x" data-act="close" aria-label="Fermer">×</button></div>
+    <div class="panel list">
+      <button class="row" data-act="goal-new-kind" data-kind="accounts"><span><div class="name">Épargner un montant</div><div class="meta">sur un ou plusieurs comptes : Livret A au plafond, réserve, voyage…</div></span><span class="amt">›</span></button>
+      <button class="row" data-act="goal-new-kind" data-kind="wealth"><span><div class="name">Atteindre un patrimoine</div><div class="meta">par exemple 1 million d'euros de patrimoine financier, avec le chemin pour y arriver</div></span><span class="amt">›</span></button>
+      <button class="row" data-act="goal-new-kind" data-kind="immo"><span><div class="name">Acheter un logement</div><div class="meta">prêt, mensualité, taux du jour, PTZ et apport à réunir</div></span><span class="amt">›</span></button>
+    </div>`;
+}
+function sheetGoalWealth(g) {
+  const d = g || { name: "1 million de patrimoine financier", target: 1000000, ret: 5, basis: "fin" };
+  return `<div class="sheet-head"><h2>Objectif de patrimoine</h2><button class="x" data-act="close" aria-label="Fermer">×</button></div>
+  <form class="f" data-kind="goalx" data-gk="wealth" data-id="${g?.id || ""}"><fieldset>
+    <label class="full">Nom<input name="name" value="${esc(d.name)}" required></label>
+    <label>Montant visé (€)<input name="target" inputmode="decimal" value="${d.target ?? ""}" required></label>
+    <label>Date visée (facultatif)<input name="date" type="date" value="${esc(d.date || "")}"></label>
+    <label>Rendement supposé (%/an)<input name="ret" inputmode="decimal" value="${d.ret ?? 5}"></label>
+    <label>Ce qui compte<select name="basis"><option value="fin" ${d.basis !== "net" ? "selected" : ""}>Patrimoine financier</option><option value="net" ${d.basis === "net" ? "selected" : ""}>Patrimoine net total</option></select></label>
+  </fieldset><p class="err" id="form-err" hidden></p>
+  <div class="actions"><button class="btn" type="submit">Enregistrer</button>${g?.id ? `<button class="btn danger" type="button" data-act="delete" data-kind="goal" data-id="${g.id}">Supprimer</button>` : ""}</div></form>`;
+}
+function sheetGoalImmo(g) {
+  const d = g || { name: "Achat de notre résidence principale", price: 250000, works: 0, kind: "ancien", zone: "B1", persons: 2, primo: true, years: 20, ins: 0.3, apport: 25000 };
+  const accs = S.accounts.filter((a) => a.type !== "courant"), r = ratesNow();
+  return `<div class="sheet-head"><h2>Projet immobilier</h2><button class="x" data-act="close" aria-label="Fermer">×</button></div>
+  <form class="f" data-kind="goalx" data-gk="immo" data-id="${g?.id || ""}"><fieldset><legend>Le bien</legend>
+    <label class="full">Nom<input name="name" value="${esc(d.name)}" required></label>
+    <label>Prix (€)<input name="price" inputmode="decimal" value="${d.price ?? ""}" required></label>
+    <label>Travaux (€)<input name="works" inputmode="decimal" value="${d.works ?? 0}"></label>
+    <label class="full">Type<select name="kind">${Object.entries(IMMO_KINDS).map(([k, l]) => `<option value="${k}" ${d.kind === k ? "selected" : ""}>${l}</option>`).join("")}</select></label>
+    <label>Zone<select name="zone">${["A", "B1", "B2", "C"].map((z) => `<option ${d.zone === z ? "selected" : ""}>${z}</option>`).join("")}</select></label>
+    <label>Date visée<input name="date" type="date" value="${esc(d.date || "")}"></label></fieldset>
+  <fieldset><legend>Financement</legend>
+    <label>Apport (€)<input name="apport" inputmode="decimal" value="${d.apport ?? 0}"></label>
+    <label>Durée<select name="years">${[15, 20, 25].map((y) => `<option value="${y}" ${(d.years || 20) === y ? "selected" : ""}>${y} ans · ${fP(rateFor(y), 2)}</option>`).join("")}</select></label>
+    <label>Ton taux (%, vide = taux du jour)<input name="rate" inputmode="decimal" value="${d.rate ?? ""}" placeholder="${String(r.t20).replace(".", ",")}"></label>
+    <label>Assurance (% du capital/an)<input name="ins" inputmode="decimal" value="${d.ins ?? 0.3}"></label>
+    <label class="full">Revenus nets du foyer par mois (€, vide = moyenne du Budget)<input name="income" inputmode="decimal" value="${d.income ?? ""}"></label></fieldset>
+  <fieldset><legend>Prêt à taux zéro</legend>
+    <label>Personnes dans le logement<input name="persons" inputmode="numeric" value="${d.persons ?? 2}"></label>
+    <label>Revenu fiscal de référence N-2 du foyer (€)<input name="rfr" inputmode="decimal" value="${d.rfr ?? ""}" placeholder="sur ton avis d'impôt"></label>
+    <label class="full chk"><input type="checkbox" name="primo" ${d.primo !== false ? "checked" : ""}> Pas propriétaires de notre résidence principale ces 2 dernières années</label></fieldset>
+  <fieldset><legend>Comptes où vous mettez l'apport de côté</legend>
+    ${accs.map((a) => `<label class="full chk"><input type="checkbox" name="acc" value="${a.id}" ${(d.accounts || []).includes(a.id) ? "checked" : ""}> ${esc(a.name)} <span class="note">${esc(a.institution || "")}</span></label>`).join("")}</fieldset>
+  <p class="err" id="form-err" hidden></p>
+  <div class="actions"><button class="btn" type="submit">Enregistrer</button>${g?.id ? `<button class="btn danger" type="button" data-act="delete" data-kind="goal" data-id="${g.id}">Supprimer</button>` : ""}</div></form>`;
+}
+async function saveGoalX(form) {
+  const fd = new FormData(form), id = form.dataset.id || null, gk = form.dataset.gk, btn = form.querySelector("[type=submit]");
+  const n = (k) => { const v = String(fd.get(k) ?? "").trim(); return v === "" ? null : num(v); };
+  let data = { kind: gk, name: String(fd.get("name")).trim(), date: String(fd.get("date") || "") || null };
+  if (gk === "wealth") data = { ...data, target: n("target"), ret: n("ret") || 5, basis: String(fd.get("basis")) };
+  else data = { ...data, price: n("price"), works: n("works") || 0, kind: "immo", type: String(fd.get("kind")), zone: String(fd.get("zone")), apport: n("apport") || 0, years: n("years") || 20, rate: n("rate"), ins: n("ins") ?? 0.3, income: n("income"), persons: n("persons") || 2, rfr: n("rfr"), primo: !!fd.get("primo"), accounts: fd.getAll("acc").map(String) };
+  if (gk === "immo") data.target = data.apport;
+  btn.disabled = true; btn.textContent = "Enregistrement…";
+  try {
+    if (id) { const { id: _d, ...old } = R.goals.find((x) => x.id === id) || {}; await db.collection("goals").doc(id).set({ ...old, ...data, profile: old.profile || profile, updatedAt: new Date().toISOString() }); }
+    else await db.collection("goals").add({ ...data, profile, createdAt: new Date().toISOString() });
+    closeSheet();
+  } catch (err) { showErr(err); btn.disabled = false; btn.textContent = "Enregistrer"; }
+}
+const immoG = (g) => ({ ...g, kind: g.type || "ancien" }); // le type de bien est rangé dans "type"
+function goalRowX(g, P) {
+  if (g.kind === "wealth") {
+    const c = wealthCalc(g, P), pct = Math.min(100, (c.cur / g.target) * 100);
+    return `<button class="goal" data-act="goal-detail" data-id="${g.id}"><span class="gh"><b>${esc(g.name)}</b><span>${fE(c.cur)} <small>/ ${fE(g.target)}</small></span></span>
+      <span class="bar"><i style="width:${pct.toFixed(1)}%"></i></span>
+      <span class="note">${fP(pct, 1)} · ${c.horizon ? `il faut ${fE(c.need[1][1])}/mois à 5 % pour la date visée` : `au rythme actuel : ${inMonths(c.m0)}`} · voir comment l'atteindre ›</span></button>`;
+  }
+  const c = immoCalc(immoG(g), P), pct = g.accounts?.length && c.apport ? Math.min(100, (c.saved / c.apport) * 100) : null;
+  return `<button class="goal" data-act="goal-detail" data-id="${g.id}"><span class="gh"><b>${esc(g.name)}</b><span>${fE(g.price)}</span></span>
+    ${pct != null ? `<span class="bar"><i style="width:${pct.toFixed(1)}%"></i></span>` : ""}
+    <span class="note">mensualité ${fE(c.total1)} sur ${c.years} ans à ${fP(c.rate, 2)}${c.ratio != null ? ` · endettement ${fP(c.ratio, 0)}` : ""} · PTZ ${c.ptz.amount ? fE(c.ptz.amount) : "non"}${pct != null ? ` · apport ${fP(pct, 0)}` : ""} ›</span></button>`;
+}
+
+// ---- dividendes et intérêts ----
+function passiveSection(P) {
+  if (profile === "sci") return "";
+  const rows = [];
+  for (const a of P.accRows) {
+    for (const h of a.hs.filter((h) => h.divPs > 0)) {
+      const months = String(h.divMonths || "").split(/[ ,;]+/).map(Number).filter((m) => m >= 1 && m <= 12);
+      rows.push({ name: h.name, sub: `${a.name} · ${fQ(h.qty)} × ${fU(h.divPs)}/an${h.divNote ? " · " + h.divNote : ""}`, year: h.qty * h.divPs, months: months.length ? months : [6], id: h.id, act: "edit-holding" });
+    }
+    if (a.type === "livret" && a.value > 0) rows.push({ name: `Intérêts ${a.name}`, sub: `${a.institution || ""} · ${fP(a.rate ?? 1.7, 2)} net`, year: a.value * ((a.rate ?? 1.7) / 100), months: [12], id: a.id, act: "open-account" });
+  }
+  if (!rows.length) return "";
+  const tot = rows.reduce((s, r) => s + r.year, 0), byM = Array(12).fill(0);
+  for (const r of rows) for (const m of r.months) byM[m - 1] += r.year / r.months.length;
+  const mx = Math.max(...byM, 1), lab = ["J", "F", "M", "A", "M", "J", "J", "A", "S", "O", "N", "D"];
+  return `<details class="section fold" data-fold="passive" ${openFolds.has("passive") ? "open" : ""}><summary><span class="fold-t"><h2>Dividendes et intérêts</h2><span class="note">${fE(tot / 12)} par mois en moyenne</span></span><b>${fE(tot)}<small> /an</small></b></summary>
+    <div class="panel"><div class="mbars">${byM.map((v, i) => `<span><i style="height:${((v / mx) * 100).toFixed(0)}%"></i><small>${lab[i]}</small></span>`).join("")}</div></div>
+    <div class="panel list" style="margin-top:10px">${rows.sort((a, b) => b.year - a.year).map((r) => `<button class="row" data-act="${r.act}" data-id="${r.id}"><span><div class="name">${esc(r.name)}</div><div class="meta">${esc(r.sub)} · versé en ${r.months.map((m) => new Date(2026, m - 1, 1).toLocaleDateString("fr-FR", { month: "short" }).replace(".", "")).join(", ")}</div></span><span class="amt">${fE2(r.year)}<small class="note">/an</small></span></button>`).join("")}</div>
+    <p class="note" style="margin-top:6px">Dividendes bruts estimés (dernier montant connu, renseigné dans chaque position) et intérêts des livrets versés au 1er janvier. Les ETF capitalisants réinvestissent leurs dividendes : rien n'est versé.</p></details>`;
+}
+
+// ---- santé financière (avec l'épargne de précaution) ----
+function healthCalc(P) {
+  const av = avgSaving(); if (!av || !(av.out > 0)) return null;
+  const liq = P.accRows.filter((a) => ["courant", "livret"].includes(a.type)).reduce((s, a) => s + a.value, 0), months = liq / av.out;
+  const inc = av.out + av.rest, rate = inc > 0 ? (av.rest / inc) * 100 : 0;
+  const loans = [...P.propRows.flatMap((p) => p.loans.map((l) => loanStatus(l).pmtAll * ((p.share ?? 100) / 100))), ...P.otherLoans.map((l) => l.s.pmtAll)].reduce((s, x) => s + x, 0);
+  const debtR = inc > 0 ? (loans / inc) * 100 : 0;
+  const tot = P.alloc.reduce((s, a) => s + a.value, 0) || 1, top = Math.max(...P.alloc.map((a) => a.value / tot)) * 100;
+  const fr = P.accRows.filter((a) => isInvestType(a.type) && a.value > 0).map((a) => ({ a, f: feesOf(a) })).filter((x) => x.f.known);
+  const fb = fr.reduce((s, x) => s + x.a.value, 0), fee = fb ? (fr.reduce((s, x) => s + x.f.total, 0) / fb) * 100 : null;
+  const parts = [
+    { k: "Taux d'épargne", v: `${fP(rate, 0)}`, pts: Math.max(0, Math.min(25, (rate / 20) * 25)), max: 25, tip: `Vise 20 % : mets ${fE(Math.max(0, inc * 0.2 - av.rest))} de plus de côté par mois.` },
+    { k: "Épargne de précaution", v: `${String(Math.round(months * 10) / 10).replace(".", ",")} mois`, pts: Math.max(0, Math.min(25, (months / 6) * 25)), max: 25, tone: months >= 6 ? "gain" : months >= 3 ? "warn" : "loss", tip: `Vise 6 mois de dépenses (${fE(av.out * 6)}) sur tes comptes et livrets : il manque ${fE(Math.max(0, av.out * 6 - liq))}.` },
+    { k: "Endettement", v: fP(debtR, 0), pts: debtR <= 35 ? 15 : Math.max(0, 15 - (debtR - 35)), max: 15, tip: "Garde tes mensualités sous 35 % de tes revenus." },
+    { k: "Diversification", v: `${fP(top, 0)} sur une seule poche`, pts: top <= 50 ? 20 : Math.max(0, 20 - (top - 50) * 0.5), max: 20, tip: "Aucune poche ne devrait dépasser la moitié de ton patrimoine." },
+    { k: "Frais", v: fee != null ? fP(fee, 2) + "/an" : "—", pts: fee == null ? 10 : fee <= 0.5 ? 15 : fee <= 1 ? 10 : fee <= 1.5 ? 5 : 0, max: 15, tip: "Privilégie les ETF et les enveloppes à frais bas (moins de 0,5 %/an)." },
+  ];
+  const score = Math.round(parts.reduce((s, p) => s + p.pts, 0));
+  const worst = [...parts].sort((a, b) => a.pts / a.max - b.pts / b.max)[0];
+  return { score, parts, worst, months, liq, out: av.out };
+}
+function healthSection(P) {
+  if (profile === "sci") return "";
+  const h = healthCalc(P); if (!h) return "";
+  const col = h.score >= 75 ? "var(--gain)" : h.score >= 50 ? "#d9822b" : "var(--loss)";
+  return `<details class="section fold" data-fold="health" ${openFolds.has("health") ? "open" : ""}><summary><span class="fold-t"><h2>Santé financière</h2><span class="note">épargne de précaution : <b class="${h.months >= 6 ? "gain" : h.months >= 3 ? "warn" : "loss"}">${String(Math.round(h.months * 10) / 10).replace(".", ",")} mois</b></span></span><b style="color:${col}">${h.score}<small>/100</small></b></summary>
+    <div class="panel kv">${h.parts.map((p) => `<div><span>${p.k}<small class="note"> · ${p.v}</small><span class="bar" style="display:block;margin-top:5px"><i style="width:${((p.pts / p.max) * 100).toFixed(0)}%;background:${p.pts / p.max >= 0.75 ? "var(--gain)" : p.pts / p.max >= 0.4 ? "#d9822b" : "var(--loss)"}"></i></span></span><span>${Math.round(p.pts)}/${p.max}</span></div>`).join("")}
+      <div class="strong"><span>Le levier le plus utile : ${h.worst.k.toLowerCase()}</span><span></span></div><div><span class="note">${h.worst.tip}</span></div></div>
+    <p class="note" style="margin-top:6px">Épargne de précaution = comptes courants et livrets (${fE(h.liq)}) divisés par tes dépenses moyennes (${fE(h.out)}/mois). Vert à partir de 6 mois, orange entre 3 et 6, rouge en dessous.</p></details>`;
+}
+
+// ---- simulateur d'achat ----
+let simAmt = 1000;
+function simOut(P, amt) {
+  const h = healthCalc(P), av = avgSaving(), save = Math.max(1, av?.save || 0);
+  const goals = R.goals.filter((g) => g.profile === profile || g.profile === "foyer" || profile === "foyer");
+  const lines = [];
+  if (h) { const after = (h.liq - amt) / h.out; lines.push(`<div><span>Épargne de précaution</span><span>${String(Math.round(h.months * 10) / 10).replace(".", ",")} → <b class="${after >= 6 ? "gain" : after >= 3 ? "warn" : "loss"}">${String(Math.round(after * 10) / 10).replace(".", ",")} mois</b></span></div>`); }
+  lines.push(`<div><span>Liquidités restantes</span><span>${fE((h?.liq ?? 0) - amt)}</span></div>`);
+  lines.push(`<div><span>Retard sur tes objectifs</span><span>${av?.save > 0 ? `≈ ${Math.max(1, Math.round(amt / save))} mois d'épargne` : "épargne nette nulle"}</span></div>`);
+  lines.push(`<div><span>Ce que ce montant serait devenu en 10 ans à 5 %</span><span>${fE(amt * Math.pow(1.05, 10))}</span></div>`);
+  for (const g of goals.filter((g) => g.kind === "wealth")) { const c = wealthCalc(g, P), m1 = monthsTo(c.cur - amt, g.target, c.save, c.ret); if (c.m0 != null && m1 != null) lines.push(`<div><span>${esc(g.name)}</span><span>${m1 - c.m0 > 0 ? "+" + (m1 - c.m0) + " mois" : "sans effet visible"}</span></div>`); }
+  return lines.join("");
+}
+function sheetSim() {
+  applyProfile(); const P = portfolio();
+  return `<div class="sheet-head"><h2>Et si j'achète ?</h2><button class="x" data-act="close" aria-label="Fermer">×</button></div>
+    <div class="panel kv"><div class="strong"><span><label for="sim-amt">Montant de l'achat (€)</label></span><span><input id="sim-amt" class="inl" inputmode="decimal" value="${simAmt}"></span></div><div id="sim-out" style="display:contents">${simOut(P, simAmt)}</div></div>
+    <p class="note" style="margin-top:8px">Payé avec tes liquidités. Le retard sur les objectifs se compte en mois de ton épargne nette moyenne.</p>`;
+}
+document.addEventListener("input", (e) => {
+  if (e.target.id !== "sim-amt") return;
+  simAmt = num(e.target.value); applyProfile(); const o = document.getElementById("sim-out"); if (o) o.innerHTML = simOut(portfolio(), simAmt);
+});
+
+// ---- coût réel de la voiture et du logement ----
+const PUBLIC_T = /sncf|ouigo|ratp|navigo|tcar|uber|bolt|lime\b|tier\b|blablacar|\bbus\b|\btrain\b|astuce|tcl\b|mobilites|ile.de.france/;
+function costsSection(D) {
+  const now = curMonth(), ms = [...new Set(D.tx.map((t) => ym(t.date)))].filter((m) => m < now).sort().slice(-3);
+  if (!ms.length) return "";
+  const pick = (f) => D.tx.filter((t) => ms.includes(ym(t.date)) && f(t));
+  const car = pick((t) => t.c === "transport" && !PUBLIC_T.test(normL(t.label))), home = pick((t) => t.c === "logement");
+  const block = (title, list, extra) => {
+    const tot = -list.reduce((s, t) => s + t.amount, 0) / ms.length; if (tot <= 0) return "";
+    const g = {}; for (const t of list) { const k = t.label.slice(0, 32); g[k] = (g[k] || 0) - t.amount / ms.length; }
+    const rows = Object.entries(g).filter(([, v]) => v > 0.5).sort((a, b) => b[1] - a[1]).slice(0, 7);
+    return `<div class="panel kv" style="margin-top:10px"><div class="strong"><span>${title}</span><span>${fE(tot)}/mois · ${fE(tot * 12)}/an</span></div>${rows.map(([k, v]) => `<div><span>${esc(k)}</span><span>${fE(v)}/mois</span></div>`).join("")}${extra || ""}</div>`;
+  };
+  const html = block("Voiture", car, `<div><span class="note">Leasing ou crédit, assurance, carburant, péages, parking et entretien. Les transports en commun sont exclus.</span></div>`) + block("Logement", home, `<div><span class="note">Loyer, énergie, assurance habitation, eau et charges.</span></div>`);
+  if (!html) return "";
+  return `<details class="section fold" data-fold="costs" ${openFolds.has("costs") ? "open" : ""}><summary><span class="fold-t"><h2>Coût réel voiture et logement</h2><span class="note">moyenne sur ${ms.length} mois · ${bScope === "all" ? "tous les comptes" : bScope === "joint" ? "compte joint" : "comptes perso"}</span></span><b>›</b></summary>${html}</details>`;
+}
+
+// ---- défis d'épargne : settings[profil].challenges ----
+const chOf = () => setOf(profile).challenges || [];
+function challengeCalc(c, D) {
+  const today = new Date().toISOString().slice(0, 10);
+  if (c.type === "nocat") {
+    const days = Math.max(1, Math.round((new Date(Math.min(Date.now(), new Date(c.to).getTime())) - new Date(c.from)) / 864e5) + 1);
+    const spent = -D.tx.filter((t) => t.c === c.cat && t.date >= c.from && t.date <= c.to).reduce((s, t) => s + t.amount, 0);
+    const ms = [...new Set(D.tx.map((t) => ym(t.date)))].filter((m) => m < ym(c.from)).sort().slice(-3);
+    const base = ms.length ? -D.tx.filter((t) => t.c === c.cat && ms.includes(ym(t.date))).reduce((s, t) => s + t.amount, 0) / ms.length / 30.4 : 0;
+    const saved = Math.max(0, base * days - spent), done = today > c.to;
+    return { title: `Pas de ${BCATS[c.cat][0].toLowerCase()} jusqu'au ${new Date(c.to).toLocaleDateString("fr-FR", { day: "numeric", month: "long" })}`, status: spent > 0.5 ? `raté de ${fE(spent)}, mais ${fE(saved)} économisés` : done ? `réussi : ${fE(saved)} économisés` : `en cours : ${fE(saved)} économisés`, ok: spent <= 0.5, saved, done };
+  }
+  const list = D.tx.filter((t) => t.date >= c.from && t.amount < 0 && BCATS[t.c]?.[1] === "out");
+  const round = list.reduce((s, t) => s + (Math.ceil(-t.amount - 1e-9) + t.amount), 0);
+  return { title: "Arrondi à l'euro supérieur", status: `${fE2(round)} à virer sur ton livret · ${fE(c.total || 0)} déjà mis de côté`, ok: true, saved: round, done: false, round };
+}
+function challengesSection(D) {
+  if (profile === "sci" || profile === "foyer") return "";
+  const chs = chOf();
+  const body = chs.length ? `<div class="panel list">${chs.map((c, i) => { const r = challengeCalc(c, D); return `<div class="row" style="cursor:default"><span><div class="name">${r.ok ? "" : "✗ "}${esc(r.title)}</div><div class="meta">${r.status}</div></span><span class="amt">${c.type === "roundup" && r.round > 0 && S.writable ? `<button class="btn sm" data-act="ch-roundup" data-i="${i}">C'est viré</button>` : ""}${S.writable ? `<button class="pill" data-act="ch-stop" data-i="${i}" aria-label="Arrêter le défi">×</button>` : ""}</span></div>`; }).join("")}</div>` : "";
+  return `<details class="section fold" data-fold="ch" ${openFolds.has("ch") ? "open" : ""}><summary><span class="fold-t"><h2>Défis d'épargne</h2><span class="note">${chs.length ? `${chs.length} en cours` : "lance un défi pour économiser sans y penser"}</span></span><b>${chs.length ? fE(chs.reduce((s, c) => s + challengeCalc(c, D).saved, 0)) : "›"}</b></summary>
+    ${body}
+    ${S.writable ? `<div class="actions" style="margin-top:8px;flex-wrap:wrap">${["resto", "shopping", "loisirs"].map((c) => `<button class="btn ghost sm" data-act="ch-start" data-type="nocat" data-cat="${c}">Pas de ${BCATS[c][0].toLowerCase()} 7 jours</button>`).join("")}${chs.some((c) => c.type === "roundup") ? "" : `<button class="btn ghost sm" data-act="ch-start" data-type="roundup">Arrondi à l'euro supérieur</button>`}</div>` : ""}
+    <p class="note" style="margin-top:6px">« Pas de… » : l'économie = ta dépense moyenne dans la catégorie sur la période, moins ce que tu as dépensé. « Arrondi » : chaque dépense arrondie à l'euro supérieur ; vire la différence sur ton Livret A puis touche « C'est viré ».</p></details>`;
+}
+async function challengeAct(act, t) {
+  const chs = [...chOf()], today = new Date().toISOString().slice(0, 10);
+  if (act === "ch-start") { const to = new Date(); to.setDate(to.getDate() + 6); chs.push(t.dataset.type === "nocat" ? { type: "nocat", cat: t.dataset.cat, from: today, to: to.toISOString().slice(0, 10) } : { type: "roundup", from: today, total: 0 }); }
+  if (act === "ch-stop") chs.splice(Number(t.dataset.i), 1);
+  if (act === "ch-roundup") { const i = Number(t.dataset.i), r = challengeCalc(chs[i], withScope("all", budgetData)); chs[i] = { ...chs[i], from: new Date(Date.now() + 864e5).toISOString().slice(0, 10), total: (chs[i].total || 0) + r.round }; }
+  openFolds.add("ch");
+  try { await saveSet(profile, { challenges: chs }); } catch (err) { showErr(err); }
+}
+
+// ---- impôt sur le revenu estimé (barème 2026, revenus 2025) ----
+const IR = { tr: [[11600, 0], [29579, 0.11], [84577, 0.3], [181917, 0.41], [Infinity, 0.45]], qf: 1807, decote: { s: [1982, 897], c: [3277, 1483] }, abatMin: 504, abatMax: 14426 };
+function irBrut(rni, parts) { const q = rni / parts; let t = 0, lo = 0; for (const [hi, r] of IR.tr) { if (q > lo) t += (Math.min(q, hi) - lo) * r; lo = hi; } return t * parts; }
+function irCalc(revs, couple, per = 0) {
+  const net = revs.map((r) => Math.max(0, r - Math.min(IR.abatMax, Math.max(IR.abatMin, r * 0.1))));
+  const one = (rni, parts, cpl) => { let t = irBrut(Math.max(0, rni), parts); const [lim, base] = cpl ? IR.decote.c : IR.decote.s; if (t <= lim) t = Math.max(0, t - Math.max(0, base - 0.4525 * t)); return Math.round(t); };
+  const tmi = (rni, parts) => { const q = rni / parts; let r0 = 0; for (const [hi, r] of IR.tr) { r0 = r; if (q <= hi) break; } return r0; };
+  if (couple) { const rni = net.reduce((a, b) => a + b, 0) - per; return { total: one(rni, 2, true), tmi: tmi(rni, 2), each: null }; }
+  const each = net.map((rni, i) => one(rni - (i === 0 ? per : 0), 1, false));
+  return { total: each.reduce((a, b) => a + b, 0), tmi: tmi(net[0] - per, 1), each };
+}
+function taxIRSection(P) {
+  if (profile === "sci") return "";
+  const st = setOf("tax"), keep = (k) => withProfile(k, () => { const D = withScope("perso", budgetData), now = curMonth(); const ms = [...new Set(D.tx.map((t) => ym(t.date)))].filter((m) => m < now).sort().slice(-3); return ms.length ? Math.round(ms.reduce((s, m) => s + D.tx.filter((t) => ym(t.date) === m && t.c === "salaire").reduce((a, t) => a + t.amount, 0), 0) / ms.length * 12) : 0; });
+  const rn = st.nathan ?? keep("nathan"), ra = st.angelique ?? keep("angelique"), per = st.per || 0;
+  const sep = irCalc([rn, ra], false, 0), cpl = irCalc([rn, ra], true, 0), perC = per ? irCalc([rn, ra], !!st.couple, per) : null, base = st.couple ? cpl : sep;
+  const inp = (k, v, ph) => `<input class="inl" data-tax="${k}" inputmode="decimal" value="${v || ""}" placeholder="${ph || ""}" ${S.writable ? "" : "disabled"}>`;
+  return `<details class="section fold" data-fold="ir" ${openFolds.has("ir") ? "open" : ""}><summary><span class="fold-t"><h2>Impôt sur le revenu estimé</h2><span class="note">${st.couple ? "pacsés ou mariés" : "deux déclarations séparées"} · barème 2026</span></span><b>${fE(base.total)}<small> /an</small></b></summary>
+    <div class="panel kv"><div class="strong"><span>Revenus nets imposables annuels</span><span></span></div>
+      <div><span>Nathan${st.nathan == null && rn ? ' <small class="note">· salaire du Budget × 12</small>' : ""}</span><span>${inp("nathan", st.nathan ?? "", rn ? String(rn) : "à renseigner")}</span></div>
+      <div><span>Angélique${st.angelique == null && ra ? ' <small class="note">· salaire du Budget × 12</small>' : ""}</span><span>${inp("angelique", st.angelique ?? "", ra ? String(ra) : "à renseigner")}</span></div>
+      <div><span>Versement PER prévu (déductible)</span><span>${inp("per", st.per ?? "", "0")}</span></div>
+      <div><span>Situation</span><span><select class="inl" data-tax="couple" ${S.writable ? "" : "disabled"}><option value="0" ${!st.couple ? "selected" : ""}>Séparés</option><option value="1" ${st.couple ? "selected" : ""}>Pacsés / mariés</option></select></span></div></div>
+    <div class="panel kv" style="margin-top:10px">
+      <div><span>Deux déclarations séparées</span><span>${fE(sep.total)}${sep.each ? `<small class="note"> (${fE(sep.each[0])} + ${fE(sep.each[1])})</small>` : ""}</span></div>
+      <div><span>Déclaration commune (PACS ou mariage)</span><span>${fE(cpl.total)}</span></div>
+      <div class="strong"><span>${cpl.total < sep.total ? "Le PACS ferait économiser" : cpl.total > sep.total ? "Le PACS coûterait" : "Le PACS ne change rien"}</span><span class="${cpl.total < sep.total ? "gain" : cpl.total > sep.total ? "loss" : ""}">${fE(Math.abs(sep.total - cpl.total))}/an</span></div>
+      <div><span>Tranche marginale ${st.couple ? "du couple" : "de Nathan"}</span><span>${fP(base.tmi * 100, 0)}</span></div>
+      ${perC ? `<div class="strong"><span>Avec ${fE(per)} versés sur un PER</span><span class="gain">−${fE(base.total - perC.total)}</span></div>` : `<div><span class="note">Un versement sur un PER réduit l'impôt d'environ ${fP(base.tmi * 100, 0)} du montant versé (ta tranche marginale), dans la limite de 10 % de tes revenus.</span></div>`}</div>
+    <p class="note" style="margin-top:6px">Estimation : abattement de 10 % sur les salaires, barème 2026 (revenus 2025) avec décote, sans réductions ni crédits d'impôt. Le salaire du Budget est un net payé, un peu plus bas que le net imposable : corrige-le avec ton avis d'impôt.</p></details>`;
+}
+document.addEventListener("change", async (e) => {
+  const k = e.target.dataset?.tax; if (!k) return;
+  openFolds.add("ir");
+  const v = k === "couple" ? e.target.value === "1" : String(e.target.value).trim() === "" ? null : num(e.target.value);
+  try { await saveSet("tax", { [k]: v }); } catch (err) { showErr(err); }
+});
+
+// ---- suivi de la SCI (profil SCI) ----
+function sciSection(P) {
+  if (profile !== "sci" || !P.propRows.length) return "";
+  return P.propRows.map((p) => {
+    const lots = p.lots || [], rentPlan = lots.reduce((s, l) => s + (l.rent || 0), 0), vacant = lots.filter((l) => /vacant/i.test(l.status || ""));
+    const occ = lots.length ? ((lots.length - vacant.length) / lots.length) * 100 : null;
+    const cur = lots.reduce((s, l) => s + (/vacant/i.test(l.status || "") ? 0 : (Number(String(l.status || "").match(/lou[ée] (\d[\d\s]*)/)?.[1]?.replace(/\s/g, "")) || l.rent || 0)), 0);
+    const st = p.loans.map(loanStatus), loanM = st.reduce((s, x) => s + x.pmtAll, 0), chargesM = ((p.tax || 0) + (p.pno || 0)) / 12 + (p.charges || 0);
+    const cash = S.accounts.reduce((s, a) => s + (a.cash || 0), 0), hasAcc = S.accounts.length > 0;
+    return `<section class="section"><div class="section-head"><h2>Suivi de la SCI</h2><span class="note">${esc(p.holder || "SCI")}</span></div>
+      <div class="grid2">${tile("Loyers prévus", fE(rentPlan) + "<small style='font-size:12px;font-weight:500'> /mois</small>", `aujourd'hui ${fE(cur)} encaissables`)}${tile("Occupation", occ != null ? fP(occ, 0) : "—", vacant.length ? `${vacant.length} lot${vacant.length > 1 ? "s" : ""} vacant${vacant.length > 1 ? "s" : ""}` : "tout est loué")}${tile("Mensualité du prêt", fE(loanM), "assurance comprise")}${tile("Trésorerie de la SCI", hasAcc ? fE(cash) : "—", hasAcc ? "comptes de la SCI" : "ajoute le compte de la SCI")}</div>
+      ${lots.length ? `<div class="panel list" style="margin-top:10px">${lots.map((l) => `<div class="row" style="cursor:default"><span><div class="name">${esc(l.name)} · ${esc(l.type || "")}</div><div class="meta">${l.surface ? String(l.surface).replace(".", ",") + " m² · " : ""}${esc(l.status || "")}</div></span><span class="amt">${fE(l.rent || 0)}<small class="note">prévu${l.market ? ` · marché ${fE(l.market)}` : ""}</small></span></div>`).join("")}</div>` : ""}
+      <div class="panel kv" style="margin-top:10px"><div class="strong"><span>Mois type après l'acte</span><span class="${tone(rentPlan - loanM - chargesM)}">${sg(rentPlan - loanM - chargesM)}</span></div>
+        <div><span>Loyers prévus</span><span>${fE(rentPlan)}</span></div><div><span>Prêt (assurance comprise)</span><span>− ${fE(loanM)}</span></div><div><span>Taxe foncière, PNO et charges</span><span>− ${fE(chargesM)}</span></div>
+        <div><span class="note">Pour suivre les loyers réellement encaissés et les appels de fonds, ajoute le compte bancaire de la SCI dans ce profil (Comptes › Ajouter) ou envoie-moi ses relevés.</span></div></div></section>`;
+  }).join("");
+}
+
+// ---- bilan de l'année ----
+let yearSel = null;
+function sheetYear() {
+  const Y = yearSel || new Date().getFullYear(), D = withScope("all", budgetData), tx = D.tx.filter((t) => t.date.startsWith(String(Y)));
+  const T = monthTotals(tx), ms = [...new Set(tx.map((t) => ym(t.date)))].length;
+  const snaps = S.snapshots.filter((s) => /^\d{4}-\d{2}-\d{2}$/.test(s.id) && s.assets != null).sort((a, b) => a.id.localeCompare(b.id));
+  const start = [...snaps].reverse().find((s) => s.id <= `${Y - 1}-12-31`) || snaps.find((s) => s.id.startsWith(String(Y)));
+  applyProfile(); const P = portfolio(), endNet = Y === new Date().getFullYear() ? P.net : (([...snaps].reverse().find((s) => s.id.startsWith(String(Y)))) || {}).assets - ((([...snaps].reverse().find((s) => s.id.startsWith(String(Y)))) || {}).debts || 0);
+  const dNet = start && Number.isFinite(endNet) ? endNet - (start.assets - start.debts) : null;
+  const perf = P.accRows.filter((a) => isInvestType(a.type)).map(accountPerf).filter(Boolean).reduce((s, r) => s + r.gain, 0);
+  const top = Object.keys(BCATS).filter((c) => BCATS[c][1] === "out" && T.by[c] < 0).map((c) => [c, -T.by[c]]).sort((a, b) => b[1] - a[1]).slice(0, 5);
+  const big = tx.filter((t) => t.amount < 0 && BCATS[t.c][1] === "out").sort((a, b) => a.amount - b.amount).slice(0, 5);
+  const av = avgSaving(), goals = R.goals.filter((g) => g.profile === profile || profile === "foyer");
+  const next = [av ? `Épargner ${fE(Math.max(100, Math.round((av.save * 1.1) / 50) * 50))}/mois (+10 %)` : "", healthCalc(P)?.months < 6 ? "Compléter l'épargne de précaution à 6 mois de dépenses" : "", top[0] ? `Réduire « ${BCATS[top[0][0]][0]} » de 10 % : ${fE(top[0][1] * 0.1)} sur l'année` : "", "Verser sur le PEA avant le 31/12 si tu n'as pas atteint ta cible", "Ajouter les dates d'ouverture des PEA et assurances-vie pour suivre leurs échéances"].filter(Boolean);
+  return `<div class="sheet-head"><h2>Bilan ${Y}</h2><button class="x" data-act="close" aria-label="Fermer">×</button></div>
+    <div class="seg" style="margin-bottom:12px">${[Y - 1, Y].map((y) => `<button class="seg-b" aria-selected="${y === Y}" data-year="${y}">${y}</button>`).join("")}</div>
+    <div class="grid2">${tile("Patrimoine net", dNet != null ? sg(dNet) : "—", Number.isFinite(endNet) ? fE(endNet) : "", dNet != null ? tone(dNet) : "")}${tile("Épargne nette", fE(T.save), ms ? `sur ${ms} mois de relevés` : "pas de relevés")}${tile("Revenus", fE(T.inc))}${tile("Dépenses", fE(T.out))}${tile("Gain des marchés", perf ? sg(perf) : "—", "placements, hors versements", perf ? tone(perf) : "")}${tile("Objectifs", String(goals.length), goals.length ? "en cours" : "aucun")}</div>
+    ${top.length ? `<div class="panel kv" style="margin-top:10px"><div class="strong"><span>Plus gros postes</span><span></span></div>${top.map(([c, v]) => `<div><span>${BCATS[c][0]}</span><span>${fE(v)}</span></div>`).join("")}</div>` : ""}
+    ${big.length ? `<div class="panel kv" style="margin-top:10px"><div class="strong"><span>Plus grosses dépenses</span><span></span></div>${big.map((t) => `<div><span>${esc(t.label)}<small class="note"> · ${new Date(t.date).toLocaleDateString("fr-FR", { day: "numeric", month: "short" })}</small></span><span>${fE2(-t.amount)}</span></div>`).join("")}</div>` : ""}
+    <div class="panel kv" style="margin-top:10px"><div class="strong"><span>Pistes pour ${Y + 1}</span><span></span></div>${next.map((n) => `<div><span>• ${n}</span></div>`).join("")}</div>
+    <p class="note" style="margin-top:8px">Profil ${esc(PROFILES.find((p) => p.k === profile).label)}. Revenus et dépenses d'après les relevés importés ; le bilan se complète avec chaque mois envoyé.</p>`;
+}
+
 /* ---------------- Formulaires ---------------- */
 const F = {
   tx: { title: "Opération", col: "tx", groups: [] },
@@ -1855,7 +2271,8 @@ const F = {
   holding: { title: "Position", col: "holdings", groups: [[null, [
     ["name", "Nom", "text", { full: 1, req: 1, ph: "ETF MSCI World" }], ["ticker", "Ticker ou ISIN", "text"], ["cls", "Classe", ASSET_CLASSES],
     ["qty", "Quantité", "number", { req: 1 }], ["pru", "PRU (€)", "number", { req: 1 }], ["price", "Cours actuel (€)", "number"], ["ter", "Frais courants du fonds (%/an)", "number"]]], ["Plan d'épargne programmé (facultatif)", [
-    ["planAmount", "Montant par mois (€)", "number"], ["planDay", "Jour d'exécution", "number", { ph: "2" }]]]] },
+    ["planAmount", "Montant par mois (€)", "number"], ["planDay", "Jour d'exécution", "number", { ph: "2" }]]], ["Dividende (facultatif)", [
+    ["divPs", "Dividende annuel par action (€)", "number"], ["divMonths", "Mois de versement", "text", { ph: "1,4,7,10" }]]]] },
   property: { title: "Bien immobilier", col: "properties", groups: [
     ["Le bien", [["name", "Nom", "text", { full: 1, req: 1, ph: "T2 Lyon 7e" }], ["address", "Adresse", "text", { full: 1, ph: "12 rue …, 69007 Lyon" }], ["type", "Usage", PROPERTY_TYPES], ["city", "Ville", "text"], ["kind", "Type de bien", "text", { ph: "Appartement, immeuble…" }], ["holder", "Détenu via", "text", { ph: "En direct, SCI…" }], ["surface", "Surface (m²)", "number"], ["share", "Quote-part détenue (%)", "number", { def: 100 }], ["bought", "Date d'achat", "date", { full: 1 }]]],
     ["Acquisition et valeur", [["price", "Prix d'achat (€)", "number", { req: 1 }], ["notary", "Frais de notaire et d'acquisition (€)", "number"], ["works", "Travaux (€)", "number"], ["value", "Valeur estimée (€)", "number"]]],
@@ -1903,6 +2320,7 @@ function readForm(form) {
   if (kind === "holding" && !o.price) o.price = o.pru;
   if (kind === "holding" && !String(fd.get("ter") ?? "").trim()) o.ter = null;
   if (kind === "holding" && !(o.planAmount > 0)) { o.planAmount = null; o.planDay = null; }
+  if (kind === "holding" && !(o.divPs > 0)) { o.divPs = null; o.divMonths = null; }
   if (kind === "holding" && o.planAmount > 0) o.planDay = Math.min(28, Math.max(1, Math.round(o.planDay || 2)));
   if (kind === "account" && !o.openedAt) o.openedAt = null;
   if (kind === "loan") { o.months = Math.round(o.years * 12); delete o.years; }
@@ -1989,6 +2407,7 @@ document.addEventListener("click", async (e) => {
   const ca = e.target.closest("[data-calall]"); if (ca) { calDay = null; if (ca.dataset.calall === "now") bMonth = new Date().toISOString().slice(0, 7); openFolds.add("recur"); return render(); }
   const cd = e.target.closest("[data-calday]"); if (cd) { const d = Number(cd.dataset.calday); calDay = calDay === d ? null : d; openFolds.add("recur"); return render(); }
   const bs = e.target.closest("[data-bscope]"); if (bs) { bScope = bs.dataset.bscope; bCat = null; return render(); }
+  const yb = e.target.closest("[data-year]"); if (yb) { yearSel = Number(yb.dataset.year); return openSheet({ html: sheetYear() }); }
   const rpb = e.target.closest("[data-rprof]"); if (rpb) { rProf = rpb.dataset.rprof; return openSheet({ html: sheetReport() }); }
   const js = e.target.closest("[data-jsplit]"); if (js) { openFolds.add("joint"); saveSet("joint", { nathan: Number(js.dataset.jsplit) }).catch(showErr); return; }
   const bc = e.target.closest("[data-bcat]"); if (bc) { bCat = bCat === bc.dataset.bcat ? null : bc.dataset.bcat; render(); document.querySelector(".txr, .dayh")?.closest("section")?.scrollIntoView({ behavior: "smooth", block: "start" }); return; }
@@ -2006,6 +2425,13 @@ document.addEventListener("click", async (e) => {
   if (act === "tx-import") { bImport = null; return openSheet({ html: sheetImport() }); }
   if (act === "tx-import-run") return runImport(t);
   if (act === "tx-caps") return openSheet({ html: sheetCaps(lastAvgs) });
+  if (act === "goal-choose") return openSheet({ html: sheetGoalChooser() });
+  if (act === "goal-new-kind") { const k = t.dataset.kind; return openSheet({ html: k === "wealth" ? sheetGoalWealth() : k === "immo" ? sheetGoalImmo() : sheetGoal(null) }); }
+  if (act === "goal-detail") { const g = R.goals.find((y) => y.id === id); return g && openSheet({ html: g.kind === "immo" ? sheetImmoDetail(g) : sheetWealthDetail(g) }); }
+  if (act === "goal-edit-form") { const g = R.goals.find((y) => y.id === id); return g && openSheet({ html: g.kind === "immo" ? sheetGoalImmo(immoG(g)) : sheetGoalWealth(g) }); }
+  if (act === "sim") return openSheet({ html: sheetSim() });
+  if (act === "year") { yearSel = null; return openSheet({ html: sheetYear() }); }
+  if (act === "ch-start" || act === "ch-stop" || act === "ch-roundup") return challengeAct(act, t);
   if (act === "report") { rProf = null; return openSheet({ html: sheetReport() }); }
   if (act === "report-share") return shareReport(t);
   if (act === "budget-settings") return openSheet({ html: sheetBudgetSettings() });
@@ -2041,6 +2467,7 @@ document.addEventListener("submit", async (e) => {
   if (kind === "caps") return saveCaps(form);
   if (kind === "bset") return saveBudgetSettings(form);
   if (kind === "alloc") return saveAlloc(form);
+  if (kind === "goalx") return saveGoalX(form);
   if (kind === "goal") return saveGoal(form);
   const data = readForm(form);
   if (kind === "holding") data.accountId = parent;
