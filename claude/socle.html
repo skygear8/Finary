@@ -149,6 +149,12 @@ input, select {
 .actions { display: flex; gap: 10px; flex-wrap: wrap; }
 .actions .btn { flex: 1 1 140px; }
 .err { color: var(--loss); font-size: 13px; }
+.upd { display: grid; grid-template-columns: minmax(0, 1fr) 130px; gap: 10px; align-items: center; padding: 8px 0; border-top: 1px solid var(--line); }
+.upd:first-of-type { border-top: 0; }
+.upd .name { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.upd input { text-align: right; }
+.upd input.changed { border-color: var(--accent); }
+.monthly { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .banner { background: var(--sunk); border-radius: 12px; padding: 10px 12px; font-size: 13px; color: var(--muted); margin-top: 12px; }
 @media (prefers-reduced-motion: no-preference) {
   .sheet { animation: up 0.22s ease-out; }
@@ -334,6 +340,7 @@ function viewSynthese(P) {
     ${tile("Cash-flow locatif", fE(cf) + "<small style='font-size:12px;font-weight:500'> /mois</small>", rental.length ? "Loyers " + fE(rental.reduce((s, p) => s + p.m.rent, 0)) + " / an" : "Aucun bien locatif", rental.length ? tone(cf) : "")}
     ${tile("Plus-values latentes", fE(P.accRows.reduce((s, a) => s + a.hs.reduce((t, h) => t + h.qty * (h.price - h.pru), 0), 0)), "Bourse et crypto", tone(P.accRows.reduce((s, a) => s + a.hs.reduce((t, h) => t + h.qty * (h.price - h.pru), 0), 0)))}
   </div>
+  <div class="section"><div class="panel monthly"><span><b>Mise à jour du mois</b><div class="note">${lastUpdateText()}</div></span><button class="btn" data-act="monthly">Mettre à jour</button></div></div>
   <section class="section">
     <h2>Répartition</h2>
     <div class="panel alloc">${donut(P.alloc)}<div class="legend">${P.alloc.map((a) => `<div><span class="dot" style="background:var(--c-${a.key})"></span><span>${a.label}</span><span class="pct">${fP((a.value / P.assets) * 100, 1)}</span><b>${fE(a.value)}</b></div>`).join("")}</div></div>
@@ -349,13 +356,14 @@ function viewComptes(P) {
   const total = P.accRows.reduce((s, a) => s + a.value, 0);
   return `
   <section class="hero"><div class="eyebrow">Comptes et placements</div><div class="big">${fE(total)}</div></section>
+  ${total ? `<button class="btn ghost add" data-act="monthly">Mise à jour du mois</button>` : ""}
   ${groups.map((g) => `
     <section class="section">
       <div class="section-head"><h2>${g.label}</h2><span class="total">${fE(g.rows.reduce((s, a) => s + a.value, 0))}</span></div>
       <div class="panel list">${g.rows.map((a) => {
         const pnl = a.hs.reduce((s, h) => s + h.qty * (h.price - h.pru), 0);
         return `<button class="row" data-act="open-account" data-id="${a.id}">
-          <span><div class="name">${esc(a.name)}</div><div class="meta">${esc(a.institution || "")}${a.hs.length ? `${a.institution ? " · " : ""}${a.hs.length} ligne${a.hs.length > 1 ? "s" : ""}` : ""}</div></span>
+          <span><div class="name">${esc(a.name)}</div><div class="meta">${esc(a.institution || "")}${a.updatedAt ? `${a.institution ? " · " : ""}${ago(a.updatedAt)}` : ""}${a.hs.length ? `${a.institution ? " · " : ""}${a.hs.length} ligne${a.hs.length > 1 ? "s" : ""}` : ""}</div></span>
           <span class="amt">${fE(a.value)}${a.hs.length ? `<small class="${tone(pnl)}">${pnl >= 0 ? "+" : "−"}${fE(Math.abs(pnl))}</small>` : ""}</span></button>`;
       }).join("")}</div>
     </section>`).join("")}
@@ -442,6 +450,36 @@ function sheetProperty(p) {
   <div class="section actions"><button class="btn ghost" data-act="edit-property" data-id="${p.id}">Modifier le bien</button></div>`;
 }
 
+function ago(iso) {
+  const d = new Date(iso); if (isNaN(d)) return "";
+  const days = Math.floor((Date.now() - d) / 864e5);
+  return days <= 0 ? "à jour aujourd'hui" : days === 1 ? "mis à jour hier" : days < 45 ? `mis à jour il y a ${days} j` : "mis à jour le " + d.toLocaleDateString("fr-FR");
+}
+function lastUpdateText() {
+  const ds = [...S.accounts, ...S.holdings, ...S.properties].map((x) => x.updatedAt).filter(Boolean).sort();
+  return ds.length ? "Dernière mise à jour : " + new Date(ds[ds.length - 1]).toLocaleDateString("fr-FR", { day: "numeric", month: "long" }) : "Tous tes soldes sur une seule page";
+}
+function sheetMonthly() {
+  const P = portfolio();
+  const inp = (name, v) => `<input id="m-${name.replace(":", "-")}" name="${name}" type="text" inputmode="decimal" value="${String(Math.round((v || 0) * 100) / 100).replace(".", ",")}" data-orig="${v || 0}" aria-label="Nouvelle valeur">`;
+  const accs = P.accRows.slice().sort((a, b) => b.value - a.value);
+  return `
+  <div class="sheet-head"><div><h2>Mise à jour du mois</h2><div class="note">Modifie ce qui a bougé, le reste ne change pas.</div></div><button class="x" data-act="close" aria-label="Fermer">×</button></div>
+  <form class="f" data-kind="monthly">
+    <fieldset style="display:block"><legend>Soldes et liquidités</legend>
+      ${accs.map((a) => `<label class="upd" for="m-acc-${a.id}"><span><div class="name">${esc(a.name)}</div><div class="note">${esc(a.institution || ACCOUNT_TYPES[a.type])}${a.updatedAt ? " · " + ago(a.updatedAt) : ""}</div></span>${inp("acc:" + a.id, a.cash)}</label>`).join("") || `<p class="note">Aucun compte.</p>`}
+    </fieldset>
+    ${S.holdings.length ? `<fieldset style="display:block"><legend>Cours des positions</legend>
+      ${accs.flatMap((a) => a.hs.map((h) => `<label class="upd" for="m-h-${h.id}"><span><div class="name">${esc(h.name)}</div><div class="note">${esc(a.name)} · ${h.qty.toLocaleString("fr-FR", { maximumFractionDigits: 6 })} parts</div></span>${inp("h:" + h.id, h.price)}</label>`)).join("")}
+    </fieldset>` : ""}
+    ${S.properties.length ? `<fieldset style="display:block"><legend>Valeur des biens (100 %)</legend>
+      ${S.properties.map((p) => `<label class="upd" for="m-p-${p.id}"><span><div class="name">${esc(p.name)}</div><div class="note">${p.updatedAt ? ago(p.updatedAt) : "estimation"}</div></span>${inp("p:" + p.id, p.value)}</label>`).join("")}
+    </fieldset>` : ""}
+    <p class="err" id="form-err" hidden></p>
+    <div class="actions"><button class="btn" type="submit">Enregistrer les changements</button></div>
+  </form>`;
+}
+
 /* ---------------- Formulaires ---------------- */
 const F = {
   account: { title: "Compte", col: "accounts", groups: [[null, [
@@ -495,7 +533,7 @@ function readForm(form) {
 /* ---------------- Sauvegarde ---------------- */
 async function save(col, id, data) {
   if (!db) throw new Error("La sauvegarde n'est pas disponible dans cette vue.");
-  if (id) await db.collection(col).doc(id).set(data);
+  if (id) await db.collection(col).doc(id).set({ ...data, updatedAt: new Date().toISOString() });
   else await db.collection(col).add({ ...data, createdAt: new Date().toISOString() });
 }
 async function remove(kind, id) {
@@ -552,9 +590,10 @@ document.addEventListener("click", async (e) => {
   const id = t.dataset.id, act = t.dataset.act;
   const find = (col) => S[col].find((x) => x.id === id);
   if (act === "close") return sheet?.back ? goBack() : closeSheet();
-  if (!S.writable && /^(new|edit)-/.test(act)) return;
+  if (!S.writable && /^(new|edit)-|^monthly$/.test(act)) return;
   if (act === "open-account") openSheet({ type: "account", id, live: true });
   else if (act === "open-property") openSheet({ type: "property", id, live: true });
+  else if (act === "monthly") openSheet({ html: sheetMonthly() });
   else if (act === "new-account") openForm("account");
   else if (act === "edit-account") openForm("account", find("accounts"));
   else if (act === "new-holding") openForm("holding", null, { parent: id, crypto: find("accounts")?.type === "crypto" });
@@ -573,6 +612,7 @@ document.addEventListener("click", async (e) => {
 document.addEventListener("submit", async (e) => {
   e.preventDefault();
   const form = e.target, kind = form.dataset.kind, id = form.dataset.id || null, parent = form.dataset.parent || null;
+  if (kind === "monthly") return saveMonthly(form);
   const data = readForm(form);
   if (kind === "holding") data.accountId = parent;
   if (kind === "loan") data.propertyId = parent;
@@ -585,6 +625,22 @@ document.addEventListener("submit", async (e) => {
     if (back) openSheet(back); else closeSheet();
   } catch (err) { showErr(err); btn.disabled = false; btn.textContent = "Enregistrer"; }
 });
+async function saveMonthly(form) {
+  const btn = form.querySelector("[type=submit]"), now = new Date().toISOString();
+  const changes = [...form.querySelectorAll("input[data-orig]")].filter((i) => Math.abs(num(i.value) - Number(i.dataset.orig)) > 0.004);
+  if (!changes.length) return closeSheet();
+  btn.disabled = true; btn.textContent = "Enregistrement…";
+  const col = { acc: "accounts", h: "holdings", p: "properties" }, field = { acc: "cash", h: "price", p: "value" };
+  try {
+    for (const i of changes) {
+      const [k, id] = i.name.split(":");
+      await db.collection(col[k]).doc(id).update({ [field[k]]: num(i.value), updatedAt: now });
+    }
+    snapDone = false; closeSheet(); snapshotToday();
+    $("#status").textContent = `${changes.length} valeur${changes.length > 1 ? "s" : ""} mise${changes.length > 1 ? "s" : ""} à jour`;
+  } catch (err) { showErr(err); btn.disabled = false; btn.textContent = "Enregistrer les changements"; }
+}
+document.addEventListener("input", (e) => { const i = e.target; if (i.dataset?.orig !== undefined) i.classList.toggle("changed", Math.abs(num(i.value) - Number(i.dataset.orig)) > 0.004); });
 function showErr(err) {
   const el = document.getElementById("form-err"); if (!el) return;
   el.hidden = false;
