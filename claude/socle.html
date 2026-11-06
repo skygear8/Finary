@@ -371,6 +371,7 @@ function viewSynthese(P) {
   </div>
   ${ytdTable(P)}
   ${costTable(P)}
+  ${feesTable(P)}
   <div class="section"><div class="panel monthly"><span><b>Mise à jour du mois</b><div class="note">${lastUpdateText()}</div></span><button class="btn" data-act="monthly">Mettre à jour</button></div></div>
   <section class="section">
     <h2>Répartition</h2>
@@ -412,6 +413,41 @@ function costTable(P) {
       <span class="amt">${fE(r.value)}<small class="${tone(r.value - r.cost)}">${sg(r.value - r.cost)}${r.cost !== r.value ? " · " + (r.base ? `${r.value - r.cost >= 0 ? "+" : ""}${fP(((r.value - r.cost) / r.base) * 100, 1)} du versé` : pct(r.value, r.cost)) : ""}</small></span></button>`).join("")}
       <div class="row"><span><div class="name"><b>Total</b></div><div class="meta">mis ${fE(tc)}</div></span><span class="amt"><b>${fE(tv)}</b><small class="${tone(tv - tc)}">${sg(tv - tc)} · ${pct(tv, tc)}</small></span></div>
     </div><p class="note" style="margin-top:6px">Placements : versements moins retraits quand on les connaît, sinon PRU × quantité plus les liquidités du compte. Le bien en SCI compte ton apport face à ta part (valeur moins crédit, plus ton apport).</p></section>`;
+}
+// frais annuels : frais courants des fonds (ter) + frais de l'enveloppe (feeUC / feeEuro), en € par an
+function feesOf(a) {
+  let fund = 0, envF = 0, unknown = 0;
+  const lines = [];
+  for (const h of a.hs) {
+    const v = h.qty * h.price, euro = h.cls === "fonds_euro", isFund = ["fonds", "etf", "obligation"].includes(h.cls);
+    const ter = euro || !isFund ? 0 : h.ter;
+    if (ter == null) unknown++;
+    const e = v * ((euro ? a.feeEuro : a.feeUC) || 0) / 100, f = v * (ter || 0) / 100;
+    fund += f; envF += e;
+    lines.push({ name: h.name, acc: a.name, id: h.id, v, ter, env: euro ? a.feeEuro : a.feeUC, cost: f + e });
+  }
+  if (!a.hs.length && a.feeUC) envF += a.value * a.feeUC / 100;
+  return { fund, env: envF, total: fund + envF, unknown, lines, known: a.feeUC != null || a.hs.some((h) => h.ter != null) };
+}
+function feesTable(P) {
+  const rows = P.accRows.filter((a) => isInvestType(a.type) && a.value > 0).map((a) => ({ a, f: feesOf(a) })).filter((x) => x.f.known).sort((x, y) => y.f.total - x.f.total);
+  if (!rows.length) return "";
+  const tot = rows.reduce((s, x) => s + x.f.total, 0), base = rows.reduce((s, x) => s + x.a.value, 0), rate = base ? tot / base : 0;
+  const yrs = 10, r = 0.05, lost = base * (Math.pow(1 + r, yrs) - Math.pow(1 + r - rate, yrs));
+  const lines = rows.flatMap((x) => x.f.lines).filter((l) => l.v > 0 && l.cost > 0).sort((a, b) => b.cost / b.v - a.cost / a.v).slice(0, 5);
+  const pc = (c, v) => fP(v ? (c / v) * 100 : 0, 2);
+  return `<section class="section"><div class="section-head"><h2>Frais annuels</h2><span class="note">estimation, au niveau d'aujourd'hui</span></div>
+    <div class="panel kv"><div class="strong"><span>Coût total par an</span><span style="white-space:nowrap">${fE(tot)} · ${pc(tot, base)}</span></div>
+      <div><span>Sur ${yrs} ans, à 5 %/an avant frais</span><span class="loss">≈ −${fE(lost)}</span></div>
+      <div><span class="note">Manque à gagner sans nouveau versement : l'écart entre ton capital sans frais et avec frais au bout de ${yrs} ans.</span></div></div>
+    <div class="panel list" style="margin-top:10px">${rows.map(({ a, f }) => `<button class="row" data-act="open-account" data-id="${a.id}"><span><div class="name">${esc(a.name)}</div>
+      <div class="meta">fonds ${fE(f.fund)} · enveloppe ${fE(f.env)}${f.unknown ? ` · ${f.unknown} ligne${f.unknown > 1 ? "s" : ""} sans frais renseignés` : ""}${a.feeNote ? `<br>${esc(a.feeNote)}` : ""}</div></span>
+      <span class="amt">${fE(f.total)}<small class="note">/an · ${pc(f.total, a.value)}</small></span></button>`).join("")}</div>
+    ${lines.length ? `<div class="section-head" style="margin-top:14px"><h2 style="font-size:15px">Les lignes les plus chères</h2><span class="note">fonds + enveloppe, en %/an</span></div>
+    <div class="panel list">${lines.map((l) => `<button class="row" data-act="edit-holding" data-id="${l.id}"><span><div class="name">${esc(l.name)}</div>
+      <div class="meta">${esc(l.acc)} · fonds ${l.ter != null ? fP(l.ter, 2) : "?"} + enveloppe ${fP(l.env || 0, 2)}</div></span>
+      <span class="amt">${pc(l.cost, l.v)}<small class="note">${fE(l.cost)} /an</small></span></button>`).join("")}</div>` : ""}
+    <p class="note" style="margin-top:6px">Frais courants des fonds (prélevés dans leur cours, donc invisibles sur tes relevés) et frais de gestion de l'enveloppe. Les actions détenues en direct n'ont pas de frais courants ; le courtage et les frais d'entrée sont ponctuels et ne sont pas comptés ici.</p></section>`;
 }
 // performance depuis une valeur de départ connue (31/12), hors versements et retraits ; % rapporté au capital engagé (départ + versements)
 function accountPerf(a) {
@@ -720,10 +756,11 @@ const F = {
   account: { title: "Compte", col: "accounts", groups: [[null, [
     ["name", "Nom", "text", { full: 1, req: 1, ph: "PEA, Livret A…" }], ["type", "Type", ACCOUNT_TYPES], ["institution", "Établissement", "text"],
     ["cash", "Liquidités ou solde (€)", "number", { full: 1 }]]], ["Historique (facultatif)", [
-    ["startValue", "Valeur au 31/12 de l'an dernier (€)", "number", { full: 1 }], ["deposits", "Total versé depuis l'ouverture (€)", "number"], ["withdrawals", "Total retiré (€)", "number"]]]] },
+    ["startValue", "Valeur au 31/12 de l'an dernier (€)", "number", { full: 1 }], ["deposits", "Total versé depuis l'ouverture (€)", "number"], ["withdrawals", "Total retiré (€)", "number"]]], ["Frais de l'enveloppe (facultatif)", [
+    ["feeUC", "Frais de gestion sur UC ou titres (%/an)", "number"], ["feeEuro", "Frais sur fonds euros (%/an)", "number"], ["feeNote", "Autres frais (entrée, courtage…)", "text", { full: 1 }]]]] },
   holding: { title: "Position", col: "holdings", groups: [[null, [
     ["name", "Nom", "text", { full: 1, req: 1, ph: "ETF MSCI World" }], ["ticker", "Ticker ou ISIN", "text"], ["cls", "Classe", ASSET_CLASSES],
-    ["qty", "Quantité", "number", { req: 1 }], ["pru", "PRU (€)", "number", { req: 1 }], ["price", "Cours actuel (€)", "number", { full: 1 }]]]] },
+    ["qty", "Quantité", "number", { req: 1 }], ["pru", "PRU (€)", "number", { req: 1 }], ["price", "Cours actuel (€)", "number"], ["ter", "Frais courants du fonds (%/an)", "number"]]]] },
   property: { title: "Bien immobilier", col: "properties", groups: [
     ["Le bien", [["name", "Nom", "text", { full: 1, req: 1, ph: "T2 Lyon 7e" }], ["address", "Adresse", "text", { full: 1, ph: "12 rue …, 69007 Lyon" }], ["type", "Usage", PROPERTY_TYPES], ["city", "Ville", "text"], ["kind", "Type de bien", "text", { ph: "Appartement, immeuble…" }], ["holder", "Détenu via", "text", { ph: "En direct, SCI…" }], ["surface", "Surface (m²)", "number"], ["share", "Quote-part détenue (%)", "number", { def: 100 }], ["bought", "Date d'achat", "date", { full: 1 }]]],
     ["Acquisition et valeur", [["price", "Prix d'achat (€)", "number", { req: 1 }], ["notary", "Frais de notaire et d'acquisition (€)", "number"], ["works", "Travaux (€)", "number"], ["value", "Valeur estimée (€)", "number"]]],
@@ -765,10 +802,11 @@ function readForm(form) {
   }
   if (kind === "property") { if (!o.value) o.value = o.price; if (!fd.get("share")) o.share = 100; }
   if (kind === "account") {
-    for (const k of ["startValue", "deposits", "withdrawals"]) if (!String(fd.get(k) ?? "").trim()) o[k] = null;
+    for (const k of ["startValue", "deposits", "withdrawals", "feeUC", "feeEuro"]) if (!String(fd.get(k) ?? "").trim()) o[k] = null;
     if (o.startValue != null) o.startDate = `${new Date().getFullYear() - 1}-12-31`;
   }
   if (kind === "holding" && !o.price) o.price = o.pru;
+  if (kind === "holding" && !String(fd.get("ter") ?? "").trim()) o.ter = null;
   if (kind === "loan") { o.months = Math.round(o.years * 12); delete o.years; }
   return o;
 }
