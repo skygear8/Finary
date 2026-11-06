@@ -270,7 +270,7 @@ function propertyMetrics(p, loans) {
     cost, rent, effRent, mgmt, expenses, net, monthlyLoan,
     next12Interest: st.reduce((a, s) => a + s.next12Interest, 0),
     gross: cost ? (rent / cost) * 100 : 0, netYield: cost ? (net / cost) * 100 : 0,
-    cashflow: net / 12 - monthlyLoan,
+    cashflow: net / 12 - monthlyLoan, myCashflow: (net / 12 - monthlyLoan) * share,
     value: (p.value || 0) * share, debt: debt100 * share, equity: ((p.value || 0) - debt100) * share,
     gain: ((p.value || 0) - cost) * share, gainPct: cost ? (((p.value || 0) - cost) / cost) * 100 : 0,
     sqm: p.surface ? (p.value || 0) / p.surface : null,
@@ -339,7 +339,7 @@ function viewSynthese(P) {
     <div class="panel empty">Ajoute ton premier compte ou ton premier bien pour voir ton patrimoine.<br>
       <button class="btn" data-act="new-account">Ajouter un compte</button> <button class="btn ghost" data-act="new-property">Ajouter un bien</button></div>`;
   const rental = P.propRows.filter((p) => p.type !== "residence_principale");
-  const cf = rental.reduce((s, p) => s + p.m.cashflow, 0);
+  const cf = rental.reduce((s, p) => s + p.m.myCashflow, 0);
   const hist = S.snapshots.map((s) => ({ x: new Date(s.id).getTime(), y: s.assets - s.debts })).sort((a, b) => a.x - b.x);
   const first = hist[0], delta = first ? P.net - first.y : 0;
   return `
@@ -470,7 +470,7 @@ function viewPositions(P) {
 
 function viewImmo(P) {
   const R = P.propRows, v = R.reduce((s, p) => s + p.m.value, 0), d = R.reduce((s, p) => s + p.m.debt, 0);
-  const cf = R.filter((p) => p.type !== "residence_principale").reduce((s, p) => s + p.m.cashflow, 0);
+  const cf = R.filter((p) => p.type !== "residence_principale").reduce((s, p) => s + p.m.myCashflow, 0);
   return `
   <section class="hero"><div class="eyebrow">Immobilier, net de crédit</div><div class="big">${fE(v - d)}</div>
     <div class="sub">Valeur ${fE(v)} · restant dû ${fE(d)}</div></section>
@@ -515,23 +515,30 @@ function missingProperty(p) {
 function sheetProperty(p) {
   const m = p.m;
   return `
-  <div class="sheet-head"><div><h2>${esc(p.name)}</h2><div class="note">${PROPERTY_TYPES[p.type] || ""}${p.city ? " · " + esc(p.city) : ""}${p.surface ? " · " + p.surface + " m² · " + fE(m.sqm) + "/m²" : ""}</div></div>
+  <div class="sheet-head"><div><h2>${esc(p.name)}</h2><div class="note">${PROPERTY_TYPES[p.type] || ""}${p.kind ? " · " + esc(p.kind) : ""}${p.city ? " · " + esc(p.city) : ""}${p.surface ? " · " + p.surface + " m² · " + fE(m.sqm) + "/m²" : ""}</div></div>
     <div class="head-btns"><button class="btn ghost sm" data-act="edit-property" data-id="${p.id}">Paramétrer</button><button class="x" data-act="close" aria-label="Fermer">×</button></div></div>
   ${missingProperty(p).length ? `<div class="todo"><b>À compléter pour des calculs justes</b><div class="chips">${missingProperty(p).map((x) => `<button class="chip" data-act="edit-property" data-id="${p.id}" data-focus="${x[0]}">${x[1]}</button>`).join("")}</div></div>` : ""}
   <div class="grid2">
     ${tile("Valeur estimée", fE(m.value), (p.share ?? 100) < 100 ? `quote-part ${p.share} % de ${fE(p.value)}` : "")}
     ${tile("Net de crédit", fE(m.equity))}
     ${tile("Plus-value latente", fE(m.gain), fP(m.gainPct, 1) + " vs coût total", tone(m.gain))}
-    ${tile("Cash-flow", fE(m.cashflow) + "<small style='font-size:12px;font-weight:500'> /mois</small>", "après crédit et charges", tone(m.cashflow))}
+    ${tile("Cash-flow", fE(m.myCashflow) + "<small style='font-size:12px;font-weight:500'> /mois</small>", (p.share ?? 100) < 100 ? `ta part · bien entier ${fE(m.cashflow)}` : "après crédit et charges", tone(m.cashflow))}
   </div>
+  ${p.address || p.holder || p.surface || p.notes ? `<section class="section"><h2>Le bien</h2><div class="panel kv">
+    ${p.address ? `<div><span>Adresse</span><span>${esc(p.address)}</span></div>` : ""}
+    ${p.kind ? `<div><span>Type</span><span>${esc(p.kind)}</span></div>` : ""}
+    ${p.surface ? `<div><span>Surface</span><span>${p.surface} m²</span></div>` : ""}
+    ${p.holder ? `<div><span>Détenu via</span><span>${esc(p.holder)}${(p.share ?? 100) < 100 ? ` · ta part ${p.share} %` : ""}</span></div>` : ""}
+    ${p.notes ? `<div style="display:block"><span class="note">${esc(p.notes)}</span></div>` : ""}
+  </div></section>` : ""}
   <section class="section"><h2>Coût d'acquisition</h2><div class="panel kv">
     <div><span>Prix d'achat</span><span>${fE(p.price)}</span></div>
-    <div><span>Frais de notaire</span><span>${fE(p.notary)}</span></div>
+    <div><span>Frais de notaire et d'acquisition</span><span>${fE(p.notary)}</span></div>
     <div><span>Travaux</span><span>${fE(p.works)}</span></div>
     <div class="strong"><span>Coût total</span><span>${fE(m.cost)}</span></div>
-    ${p.bought ? `<div><span>Acheté le</span><span>${new Date(p.bought).toLocaleDateString("fr-FR")}</span></div>` : ""}
+    ${p.bought ? `<div><span>${new Date(p.bought) > new Date() ? "Acte prévu le" : "Acheté le"}</span><span>${new Date(p.bought).toLocaleDateString("fr-FR")}</span></div>` : ""}
   </div></section>
-  ${m.rent ? `<section class="section"><h2>Rentabilité sur un an</h2><div class="panel kv">
+  ${m.rent ? `<section class="section"><h2>Rentabilité sur un an${(p.share ?? 100) < 100 ? " (bien entier)" : ""}</h2><div class="panel kv">
     <div><span>Loyers hors charges</span><span>${fE(m.rent)}</span></div>
     <div><span>Vacance (${p.vacancy || 0} %)</span><span>− ${fE(m.rent - m.effRent)}</span></div>
     <div><span>Charges de copro non récupérables</span><span>− ${fE((p.charges || 0) * 12)}</span></div>
@@ -552,7 +559,7 @@ function sheetProperty(p) {
       yearly.unshift({ x: new Date(l.start).getTime(), y: l.principal });
       return `<div class="panel" style="display:grid;gap:12px">
         <div class="section-head"><b>${esc(l.name)}</b><button class="btn ghost" data-act="edit-loan" data-id="${l.id}">Modifier</button></div>
-        <div class="grid2">${tile("Restant dû (100 %)", fE(s.remaining), "sur " + fE(l.principal))}${tile("Mensualité", fE2(s.pmtAll), "dont assurance " + fE2(l.insurance))}${tile("Taux, durée", fP(l.rate), l.months / 12 + " ans · fin " + s.end)}${tile("Coût total", fE(s.totalCost), "intérêts payés " + fE(s.interestPaid))}</div>
+        <div class="grid2">${tile("Restant dû (100 %)", fE(s.remaining), "sur " + fE(l.principal))}${tile("Mensualité", fE2(s.pmtAll), "dont assurance " + fE2(l.insurance))}${tile("Taux, durée", fP(l.rate), l.months / 12 + " ans · fin " + s.end)}${tile("Coût total", fE(s.totalCost + (l.fees || 0)), (l.fees ? "dont frais " + fE(l.fees) + " · " : "") + "intérêts payés " + fE(s.interestPaid))}</div>
         <div><div class="section-head note"><span>${s.paid} échéances payées</span><span>${l.months - s.paid} restantes</span></div><div class="bar"><i style="width:${s.progress.toFixed(1)}%"></i></div></div>
         ${lineChart(yearly, "Capital restant dû")}
       </div>`;
@@ -600,12 +607,12 @@ const F = {
     ["name", "Nom", "text", { full: 1, req: 1, ph: "ETF MSCI World" }], ["ticker", "Ticker ou ISIN", "text"], ["cls", "Classe", ASSET_CLASSES],
     ["qty", "Quantité", "number", { req: 1 }], ["pru", "PRU (€)", "number", { req: 1 }], ["price", "Cours actuel (€)", "number", { full: 1 }]]]] },
   property: { title: "Bien immobilier", col: "properties", groups: [
-    ["Le bien", [["name", "Nom", "text", { full: 1, req: 1, ph: "T2 Lyon 7e" }], ["type", "Usage", PROPERTY_TYPES], ["city", "Ville", "text"], ["surface", "Surface (m²)", "number"], ["share", "Quote-part détenue (%)", "number", { def: 100 }], ["bought", "Date d'achat", "date", { full: 1 }]]],
-    ["Acquisition et valeur", [["price", "Prix d'achat (€)", "number", { req: 1 }], ["notary", "Frais de notaire (€)", "number"], ["works", "Travaux (€)", "number"], ["value", "Valeur estimée (€)", "number"]]],
+    ["Le bien", [["name", "Nom", "text", { full: 1, req: 1, ph: "T2 Lyon 7e" }], ["address", "Adresse", "text", { full: 1, ph: "12 rue …, 69007 Lyon" }], ["type", "Usage", PROPERTY_TYPES], ["city", "Ville", "text"], ["kind", "Type de bien", "text", { ph: "Appartement, immeuble…" }], ["holder", "Détenu via", "text", { ph: "En direct, SCI…" }], ["surface", "Surface (m²)", "number"], ["share", "Quote-part détenue (%)", "number", { def: 100 }], ["bought", "Date d'achat", "date", { full: 1 }]]],
+    ["Acquisition et valeur", [["price", "Prix d'achat (€)", "number", { req: 1 }], ["notary", "Frais de notaire et d'acquisition (€)", "number"], ["works", "Travaux (€)", "number"], ["value", "Valeur estimée (€)", "number"]]],
     ["Loyers et charges", [["rent", "Loyer mensuel HC (€)", "number"], ["charges", "Copro non récup. / mois (€)", "number"], ["tax", "Taxe foncière / an (€)", "number"], ["pno", "Assurance PNO / an (€)", "number"], ["mgmt", "Gestion (% des loyers)", "number"], ["vacancy", "Vacance locative (%)", "number"]]]] },
   loan: { title: "Crédit", col: "loans", groups: [[null, [
     ["name", "Nom", "text", { full: 1, def: "Prêt immobilier" }], ["principal", "Montant emprunté (€)", "number", { req: 1 }], ["rate", "Taux nominal (%)", "number", { req: 1 }],
-    ["years", "Durée (années)", "number", { def: 20, req: 1 }], ["start", "Date de déblocage", "date", { req: 1 }], ["insurance", "Assurance / mois (€)", "number", { full: 1 }]]]] },
+    ["years", "Durée (années)", "number", { def: 20, req: 1 }], ["start", "Date de déblocage", "date", { req: 1 }], ["insurance", "Assurance / mois (€)", "number"], ["fees", "Frais de dossier et garantie (€)", "number"]]]] },
 };
 
 function formHtml(kind, data, extra) {
