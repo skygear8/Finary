@@ -385,6 +385,9 @@ details.fold > summary .note b { font-family: var(--font-body); font-weight: 700
 .idea > summary::after { content: "Risques et source ›"; font-size: 12px; color: var(--accent); }
 .idea[open] > summary::after { content: "Masquer ‹"; }
 .sheet .sheet-head + .panel + .sheet-head .x { display: none; }
+.gauge { position: relative; height: 10px; border-radius: 99px; background: linear-gradient(90deg, var(--loss), color-mix(in srgb, var(--muted) 40%, transparent) 50%, var(--gain)); margin: 6px 4px 0; }
+.gauge i { position: absolute; top: 50%; width: 18px; height: 18px; border-radius: 99px; background: var(--surface); border: 3px solid var(--fg); transform: translate(-50%, -50%); }
+.gauge-l { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); margin-top: 8px; }
 </style>
 
 <div class="wrap">
@@ -505,11 +508,11 @@ function propertyMetrics(p, loans) {
 
 /* ---------------- État ---------------- */
 const S = { accounts: [], holdings: [], properties: [], parts: [], loans: [], snapshots: [], flows: [], ready: false, writable: true };
-const COLS = ["accounts", "holdings", "properties", "loans", "snapshots", "flows", "tx", "rules", "caps", "goals", "settings", "market", "prices"];
+const COLS = ["accounts", "holdings", "properties", "loans", "snapshots", "flows", "tx", "rules", "caps", "goals", "settings", "market", "prices", "watch"];
 // profils : chaque compte / bien porte `profile` (absent = nathan). R garde tout, S ne montre que le profil choisi.
 const PROFILES = [{ k: "nathan", label: "Nathan" }, { k: "angelique", label: "Angélique" }, { k: "sci", label: "SCI" }, { k: "foyer", label: "Foyer" }];
 // biens d'une SCI : profile "sci" ; chaque associé voit ses parts (share %, partner = profil associé, nathan par défaut), pas l'immeuble
-const R = { accounts: [], holdings: [], properties: [], loans: [], snapshots: [], flows: [], tx: [], rules: [], caps: [], goals: [], settings: [], market: [], prices: [] };
+const R = { accounts: [], holdings: [], properties: [], loans: [], snapshots: [], flows: [], tx: [], rules: [], caps: [], goals: [], settings: [], market: [], prices: [], watch: [] };
 const openFolds = new Set();
 document.addEventListener("toggle", (e) => { const d = e.target; if (d?.dataset?.fold) d.open ? openFolds.add(d.dataset.fold) : openFolds.delete(d.dataset.fold); }, true);
 let profile = "nathan"; try { const v = localStorage.getItem("socle-profil"); if (PROFILES.some((p) => p.k === v)) profile = v; } catch { }
@@ -1434,25 +1437,92 @@ function fixedCharges() {
 
 // onglet Marchés : collection market, doc "latest" écrit chaque soir par la tâche programmée (la page ne peut pas aller sur le web)
 // {date, mood, summary, indices:[{name, value, d1, ytd}], news:[{title, src, url, impact, why}], ideas:[{name, isin, ticker, type, env:["PEA","CTO"], thesis, risks, horizon, price, cur, src, url}], watch:[...]}
-let mEnv = "all";
+let mEnv = "all", mDay = null;
+const mDocs = () => R.market.filter((x) => /^\d{4}-\d{2}-\d{2}$/.test(x.id)).sort((a, b) => b.id.localeCompare(a.id));
+const pcT = (v, d = 1) => v == null || isNaN(v) ? "" : `<span class="${v >= 0 ? "gain" : "loss"}">${v >= 0 ? "+" : "−"}${String(Math.abs(v).toFixed(d)).replace(".", ",")} %</span>`;
+const dLong = (d) => d ? new Date(d).toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" }) : "";
+// 1. impact du jour : écart entre les deux derniers cours connus de chaque ligne
+function dayImpact() {
+  const hs = R.holdings.filter((h) => { const a = R.accounts.find((x) => x.id === h.accountId); return a && (profile === "foyer" ? ownerOf(a) !== "sci" : ownerOf(a) === profile) && h.qty > 0; });
+  const rows = hs.map((h) => { const pts = R.prices.find((x) => x.id === h.id)?.pts || []; if (pts.length < 2) return null; const [d0, p0] = pts[pts.length - 2], [d1, p1] = pts[pts.length - 1]; return { h, d0, d1, eur: h.qty * (p1 - p0), pct: (p1 / p0 - 1) * 100 }; }).filter(Boolean);
+  return { rows, tot: rows.reduce((s, r) => s + r.eur, 0), base: rows.reduce((s, r) => s + r.h.qty * (r.h.price - r.eur / r.h.qty), 0) };
+}
+function impactSection() {
+  const I = dayImpact();
+  if (!I.rows.length) return `<section class="section"><h2>Ton portefeuille au dernier cours</h2><div class="panel note">Le détail apparaîtra dès que deux cours auront été enregistrés pour tes lignes (mise à jour en semaine le soir).</div></section>`;
+  const up = [...I.rows].sort((a, b) => b.eur - a.eur), top = [...up.slice(0, 3), ...up.slice(-3).reverse()].filter((r, i, arr) => arr.indexOf(r) === i && Math.abs(r.eur) >= 0.5);
+  return `<section class="section"><div class="section-head"><h2>Ton portefeuille au dernier cours</h2><span class="total ${tone(I.tot)}">${sg(I.tot)} ${I.base ? pcT((I.tot / I.base) * 100, 2) : ""}</span></div>
+    <div class="panel list">${top.map((r) => `<div class="row" style="cursor:default"><span><div class="name">${esc(r.h.name)}</div><div class="meta">${new Date(r.d0).toLocaleDateString("fr-FR", { day: "numeric", month: "short" })} → ${new Date(r.d1).toLocaleDateString("fr-FR", { day: "numeric", month: "short" })}</div></span><span class="amt ${tone(r.eur)}">${sg(r.eur)}<small>${pcT(r.pct)}</small></span></div>`).join("") || `<div class="empty">Pas de mouvement notable.</div>`}</div>
+    <p class="note">Écart entre les deux derniers cours enregistrés de chaque ligne (${I.rows.length} lignes suivies).</p></section>`;
+}
+// 2. liste de surveillance : collection watch {profile, name, isin, ticker, target, price, priceDate, note}
+function watchSection() {
+  const W = R.watch.filter((w) => profile === "foyer" || (w.profile || "nathan") === profile);
+  const rows = W.map((w) => { const hit = w.price > 0 && w.target > 0 && w.price <= w.target, gap = w.price > 0 && w.target > 0 ? (w.price / w.target - 1) * 100 : null;
+    return `<button class="row" data-act="watch-edit" data-id="${w.id}"><span><div class="name">${esc(w.name)}${hit ? ` <span class="pill" style="background:color-mix(in srgb,var(--gain) 16%,transparent);color:var(--gain)">prix visé atteint</span>` : ""}</div><div class="meta">${w.target ? `visé ${fE(w.target)}` : "sans prix visé"}${gap != null && !hit ? ` · encore ${String(Math.abs(gap).toFixed(1)).replace(".", ",")} % au-dessus` : ""}${w.note ? ` · ${esc(w.note)}` : ""}</div></span><span class="amt">${w.price ? fE(w.price) : "—"}<small class="note">${w.priceDate ? new Date(w.priceDate).toLocaleDateString("fr-FR", { day: "numeric", month: "short" }) : "cours à venir"}</small></span></button>`; }).join("");
+  return `<section class="section"><div class="section-head"><h2>Ma liste de surveillance</h2>${S.writable ? `<button class="btn ghost sm" data-act="watch-new">Ajouter</button>` : ""}</div>
+    <div class="panel list">${rows || `<div class="empty">Ajoute une action ou un ETF avec le prix auquel tu aimerais l'acheter : le cours est suivi chaque soir et une alerte s'affiche quand il est atteint.</div>`}</div></section>`;
+}
+function sheetWatch(w) {
+  const d = w || {};
+  return `<div class="sheet-head"><h2>${w?.id ? "Modifier la surveillance" : "Surveiller une valeur"}</h2><button class="x" data-act="close" aria-label="Fermer">×</button></div>
+  <form class="f" data-kind="watch" data-id="${w?.id || ""}"><fieldset>
+    <label class="full">Nom<input name="name" value="${esc(d.name || "")}" placeholder="ASML" required></label>
+    <label>ISIN<input name="isin" value="${esc(d.isin || "")}" placeholder="NL0010273215"></label>
+    <label>Ticker<input name="ticker" value="${esc(d.ticker || "")}"></label>
+    <label>Prix visé (€)<input name="target" inputmode="decimal" value="${d.target ?? ""}"></label>
+    <label>Cours actuel (€)<input name="price" inputmode="decimal" value="${d.price ?? ""}" placeholder="mis à jour le soir"></label>
+    <label class="full">Note<input name="note" value="${esc(d.note || "")}" placeholder="pour le PEA, renforcer sous 600 €"></label>
+  </fieldset><p class="err" id="form-err" hidden></p>
+  <div class="actions"><button class="btn" type="submit">Enregistrer</button>${w?.id ? `<button class="btn danger" type="button" data-act="watch-del" data-id="${w.id}">Supprimer</button>` : ""}</div></form>`;
+}
+async function saveWatch(form) {
+  const fd = new FormData(form), id = form.dataset.id || null, btn = form.querySelector("[type=submit]");
+  const n = (k) => { const v = String(fd.get(k) ?? "").trim(); return v === "" ? null : num(v); };
+  const old = id ? R.watch.find((x) => x.id === id) : null;
+  const data = { name: String(fd.get("name")).trim(), isin: String(fd.get("isin") || "").trim().toUpperCase(), ticker: String(fd.get("ticker") || "").trim(), target: n("target"), note: String(fd.get("note") || "").trim(), profile: old?.profile || (profile === "foyer" ? "nathan" : profile) };
+  const pr = n("price"); if (pr != null && pr !== old?.price) { data.price = pr; data.priceDate = new Date().toISOString().slice(0, 10); }
+  btn.disabled = true; btn.textContent = "Enregistrement…";
+  try {
+    if (id) { const { id: _i, ...o } = old || {}; await db.collection("watch").doc(id).set({ ...o, ...data, updatedAt: new Date().toISOString() }); }
+    else await db.collection("watch").add({ ...data, createdAt: new Date().toISOString() });
+    closeSheet();
+  } catch (err) { showErr(err); btn.disabled = false; btn.textContent = "Enregistrer"; }
+}
 function viewMarket(P) {
-  const m = R.market.find((x) => x.id === "latest");
-  if (!m) return `<section class="hero"><div class="eyebrow">Marchés</div><div class="big" style="font-size:30px">Bientôt ici</div><div class="sub">Le point marchés arrive avec la mise à jour du soir.</div></section>`;
-  const mine = new Set(R.holdings.filter((h) => ownerOf(R.accounts.find((a) => a.id === h.accountId) || {}) === profile || profile === "foyer").map((h) => h.isin).filter(Boolean));
-  const pc = (v) => v == null ? "" : `<span class="${v >= 0 ? "gain" : "loss"}">${v >= 0 ? "+" : "−"}${String(Math.abs(v).toFixed(1)).replace(".", ",")} %</span>`;
+  const all = mDocs(), latest = R.market.find((x) => x.id === "latest");
+  const m = mDay ? all.find((x) => x.id === mDay) || latest : latest;
+  if (!m) return `<section class="hero"><div class="eyebrow">Marchés</div><div class="big" style="font-size:30px">Bientôt ici</div><div class="sub">Le point marchés arrive avec la mise à jour du soir.</div></section>${watchSection()}`;
+  const old = mDay && m !== latest;
+  const mine = new Set(R.holdings.filter((h) => { const a = R.accounts.find((x) => x.id === h.accountId); return a && (profile === "foyer" || ownerOf(a) === profile); }).map((h) => h.isin).filter(Boolean));
+  const watched = new Set(R.watch.map((w) => w.isin).filter(Boolean));
   const ideas = (m.ideas || []).filter((i) => mEnv === "all" || (i.env || []).includes(mEnv));
   const impact = { pos: ["▲", "gain"], neg: ["▼", "loss"], neu: ["•", ""] };
-  const d = m.date ? new Date(m.date).toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" }) : "";
-  return `<section class="hero"><div class="eyebrow">Marchés · ${esc(d)}</div><div class="big" style="font-size:clamp(26px,7vw,34px);line-height:1.15">${esc(m.mood || "Le point du jour")}</div><div class="sub">${esc(m.summary || "")}</div></section>
-  ${(m.indices || []).length ? `<div class="grid2 grid4" style="margin-top:14px">${m.indices.map((x) => `<div class="tile"><div class="k">${esc(x.name)}</div><div class="v">${esc(String(x.value))}</div><div class="s">${x.d1 != null ? pc(x.d1) + " jour" : "&nbsp;"}${x.ytd != null ? ` · ${pc(x.ytd)} sur l'année` : ""}</div></div>`).join("")}</div>` : ""}
-  ${(m.news || []).length ? `<section class="section"><h2>Ce qui fait bouger les marchés</h2><div class="panel list">${m.news.map((n) => { const [ic, cl] = impact[n.impact] || impact.neu; return `<div class="row" style="cursor:default;grid-template-columns:18px minmax(0,1fr)"><b class="${cl}">${ic}</b><span style="min-width:0"><span class="name" style="white-space:normal;display:block">${esc(n.title)}</span><span class="note">${esc(n.why || "")}${n.src ? ` · ${n.url ? `<a href="${esc(n.url)}" target="_blank" rel="noopener">${esc(n.src)}</a>` : esc(n.src)}` : ""}</span></span></div>`; }).join("")}</div></section>` : ""}
+  const newsList = (arr) => `<div class="panel list">${arr.map((n) => { const [ic, cl] = impact[n.impact] || impact.neu; return `<div class="row" style="cursor:default;grid-template-columns:18px minmax(0,1fr)"><b class="${cl}">${ic}</b><span style="min-width:0"><span class="name" style="white-space:normal;display:block">${n.name ? `<span class="pill">${esc(n.name)}</span> ` : ""}${esc(n.title)}</span><span class="note">${esc(n.why || "")}${n.src ? ` · ${n.url ? `<a href="${esc(n.url)}" target="_blank" rel="noopener">${esc(n.src)}</a>` : esc(n.src)}` : ""}</span></span></div>`; }).join("")}</div>`;
+  const g = m.gauge, gz = g ? (g.score < 25 ? ["Peur extrême", "loss"] : g.score < 45 ? ["Peur", "loss"] : g.score <= 55 ? ["Neutre", ""] : g.score <= 75 ? ["Avidité", "gain"] : ["Avidité extrême", "gain"]) : null;
+  const maxS = Math.max(1, ...(m.sectors || []).map((x) => Math.abs(x.w1 || 0)));
+  return `<section class="hero"><div class="eyebrow">Marchés · ${esc(dLong(m.date))}${old ? " · archive" : ""}</div><div class="big" style="font-size:clamp(26px,7vw,34px);line-height:1.15">${esc(m.mood || "Le point du jour")}</div><div class="sub">${esc(m.summary || "")}</div></section>
+  ${old ? `<div class="seg acts" style="margin-top:10px"><button class="seg-b" data-mday="">Revenir au dernier point</button></div>` : ""}
+  ${old ? "" : impactSection()}
+  ${g ? `<section class="section"><div class="section-head"><h2>Baromètre du marché</h2><span class="total ${gz[1]}">${gz[0]} · ${g.score}/100</span></div>
+    <div class="panel"><div class="gauge"><i style="left:${Math.max(0, Math.min(100, g.score))}%"></i></div><div class="gauge-l"><span>Peur</span><span>Neutre</span><span>Avidité</span></div>
+    <p class="note" style="margin-top:8px">${esc(g.note || "")}${g.vix != null ? ` VIX ${String(g.vix).replace(".", ",")}.` : ""} Quand la peur domine, les prix sont souvent plus bas pour qui investit sur le long terme ; quand l'avidité domine, prudence sur les achats d'un coup.</p></div></section>` : ""}
+  ${(m.indices || []).length ? `<div class="grid2 grid4" style="margin-top:14px">${m.indices.map((x) => `<div class="tile"><div class="k">${esc(x.name)}</div><div class="v">${esc(String(x.value))}</div><div class="s">${x.d1 != null ? pcT(x.d1) + " jour" : "&nbsp;"}${x.ytd != null ? ` · ${pcT(x.ytd)} sur l'année` : ""}</div></div>`).join("")}</div>` : ""}
+  ${(m.sectors || []).length ? `<section class="section"><div class="section-head"><h2>Secteurs et régions</h2><span class="note">sur la semaine</span></div><div class="panel cats">${m.sectors.map((x) => `<div class="catrow" style="cursor:default"><span class="dot" style="background:${(x.w1 || 0) >= 0 ? "var(--gain)" : "var(--loss)"}"></span><span class="cn">${esc(x.name)}${x.note ? `<small>${esc(x.note)}</small>` : ""}</span><span class="cv">${pcT(x.w1)}</span><span class="bar"><i style="width:${((Math.abs(x.w1 || 0) / maxS) * 100).toFixed(1)}%;background:${(x.w1 || 0) >= 0 ? "var(--gain)" : "var(--loss)"}"></i></span></div>`).join("")}</div></section>` : ""}
+  ${(m.mine || []).length ? `<section class="section"><h2>Actus de tes lignes</h2>${newsList(m.mine)}</section>` : ""}
+  ${(m.news || []).length ? `<section class="section"><h2>Ce qui fait bouger les marchés</h2>${newsList(m.news)}</section>` : ""}
+  ${(m.agenda || []).length ? `<section class="section"><div class="section-head"><h2>Agenda</h2><span class="note">à venir</span></div><div class="panel list">${m.agenda.map((a) => `<div class="row" style="cursor:default;grid-template-columns:44px minmax(0,1fr)"><span class="cal-day ev">${new Date(a.date).getDate()}<small>${new Date(a.date).toLocaleDateString("fr-FR", { month: "short" })}</small></span><span style="min-width:0"><span class="name" style="white-space:normal;display:block">${esc(a.title)}</span><span class="note">${esc(a.kind || "")}${a.why ? ` · ${esc(a.why)}` : ""}</span></span></div>`).join("")}</div></section>` : ""}
+  ${(m.rates || []).length ? `<section class="section"><h2>Taux et devises</h2><div class="panel kv">${m.rates.map((r) => `<div><span>${esc(r.name)}${r.note ? ` <small class="note">· ${esc(r.note)}</small>` : ""}</span><span>${esc(String(r.value))}</span></div>`).join("")}</div></section>` : ""}
   <section class="section"><div class="section-head"><h2>Idées à étudier</h2><span class="note">${ideas.length} idée${ideas.length > 1 ? "s" : ""}</span></div>
     <div class="seg" role="tablist" aria-label="Enveloppe">${[["all", "Tout"], ["PEA", "PEA"], ["CTO", "CTO"]].map(([k, l]) => `<button role="tab" class="seg-b" aria-selected="${mEnv === k}" data-menv="${k}">${l}</button>`).join("")}</div>
-    <div class="panel goals">${ideas.map((i) => `<details class="idea"><summary><span class="gh"><b>${esc(i.name)}</b><span class="note">${i.price != null ? `${String(i.price).replace(".", ",")} ${esc(i.cur || "€")}` : ""}</span></span>
-      <span class="chips">${(i.env || []).map((e) => `<span class="pill">${esc(e)}</span>`).join("")}<span class="pill">${esc(i.type || "")}</span>${i.horizon ? `<span class="pill">${esc(i.horizon)}</span>` : ""}${mine.has(i.isin) ? `<span class="pill" style="background:color-mix(in srgb,var(--gain) 14%,transparent);color:var(--gain)">déjà en portefeuille</span>` : ""}</span>
+    <div class="panel goals">${ideas.map((i) => { const perf = i.since?.price && i.price ? (i.price / i.since.price - 1) * 100 : null; return `<details class="idea"><summary><span class="gh"><b>${esc(i.name)}</b><span class="note">${i.price != null ? `${String(i.price).replace(".", ",")} ${esc(i.cur || "€")}` : ""}</span></span>
+      <span class="chips">${(i.env || []).map((e) => `<span class="pill">${esc(e)}</span>`).join("")}<span class="pill">${esc(i.type || "")}</span>${i.horizon ? `<span class="pill">${esc(i.horizon)}</span>` : ""}${mine.has(i.isin) ? `<span class="pill" style="background:color-mix(in srgb,var(--gain) 14%,transparent);color:var(--gain)">déjà en portefeuille</span>` : ""}${perf != null ? `<span class="pill">${perf >= 0 ? "+" : "−"}${String(Math.abs(perf).toFixed(1)).replace(".", ",")} % depuis le ${new Date(i.since.date).toLocaleDateString("fr-FR", { day: "numeric", month: "short" })}</span>` : ""}</span>
       <span class="note" style="color:var(--fg)">${esc(i.thesis || "")}</span></summary>
-      <div class="kv" style="margin-top:8px">${i.risks ? `<div><span>Risques</span></div><p class="note" style="margin:0">${esc(i.risks)}</p>` : ""}${i.isin ? `<div><span>ISIN</span><span>${esc(i.isin)}${i.ticker ? ` · ${esc(i.ticker)}` : ""}</span></div>` : ""}${i.src ? `<div><span>Source</span><span>${i.url ? `<a href="${esc(i.url)}" target="_blank" rel="noopener">${esc(i.src)}</a>` : esc(i.src)}</span></div>` : ""}</div></details>`).join("") || `<div class="empty">Aucune idée pour cette enveloppe aujourd'hui.</div>`}</div>
-    <p class="note">Pistes repérées dans l'actualité et les analyses publiées, pas des conseils personnalisés : vérifie avant d'acheter et garde ta répartition cible en tête. Les marchés peuvent baisser.</p></section>`;
+      <div class="kv" style="margin-top:8px">${i.risks ? `<div><span>Risques</span></div><p class="note" style="margin:0">${esc(i.risks)}</p>` : ""}${i.isin ? `<div><span>ISIN</span><span>${esc(i.isin)}${i.ticker ? ` · ${esc(i.ticker)}` : ""}</span></div>` : ""}${i.src ? `<div><span>Source</span><span>${i.url ? `<a href="${esc(i.url)}" target="_blank" rel="noopener">${esc(i.src)}</a>` : esc(i.src)}</span></div>` : ""}</div>
+      ${S.writable && i.isin && !watched.has(i.isin) ? `<button class="btn ghost sm" style="margin-top:8px" data-act="watch-idea" data-idea='${esc(JSON.stringify({ name: i.name, isin: i.isin, ticker: i.ticker || "", price: i.price ?? null }))}'>Surveiller</button>` : i.isin && watched.has(i.isin) ? `<p class="note" style="margin-top:6px">Dans ta liste de surveillance.</p>` : ""}</details>`; }).join("") || `<div class="empty">Aucune idée pour cette enveloppe ce jour-là.</div>`}</div>
+    <p class="note">Pistes repérées dans l'actualité et les analyses publiées, pas des conseils personnalisés : vérifie avant d'acheter et garde ta répartition cible en tête. Les marchés peuvent baisser.</p></section>
+  ${watchSection()}
+  ${all.length ? `<section class="section"><h2>Points précédents</h2><div class="panel list">${all.slice(0, 15).map((d) => `<button class="row" data-mday="${d.id}"><span><div class="name">${esc(d.mood || "")}</div><div class="meta" style="text-transform:capitalize">${esc(dLong(d.date || d.id))}</div></span><span class="amt">${(d.indices || []).find((x) => x.name === "CAC 40") ? `<small>CAC ${pcT((d.indices || []).find((x) => x.name === "CAC 40").d1)}</small>` : "›"}</span></button>`).join("")}</div></section>` : ""}`;
 }
 // objectifs : collection goals {profile, name, target, accounts[], date?}
 function goalsSection(P) {
@@ -2640,6 +2710,7 @@ document.addEventListener("click", async (e) => {
   const ps = e.target.closest("[data-possort]"); if (ps) { posSort = ps.dataset.possort; return render(); }
   const rg = e.target.closest("[data-range]"); if (rg) { histRange = rg.dataset.range; return render(); }
   const me = e.target.closest("[data-menv]"); if (me) { mEnv = me.dataset.menv; return render(); }
+  const md = e.target.closest("[data-mday]"); if (md) { mDay = md.dataset.mday || null; render(); return window.scrollTo(0, 0); }
   const se = e.target.closest("[data-series]"); if (se) { histSeries = se.dataset.series; return render(); }
   const t = e.target.closest("[data-tab],[data-act]"); if (!t) return;
   if (t.dataset.tab) return setTab(t.dataset.tab);
@@ -2666,6 +2737,10 @@ document.addEventListener("click", async (e) => {
   if (act === "new-goal") { let pre = null; try { pre = t.dataset.preset ? JSON.parse(t.dataset.preset) : null; } catch { } return openSheet({ html: sheetGoal(pre) }); }
   if (act === "edit-goal") { const g = R.goals.find((y) => y.id === id); return g && openSheet({ html: g.kind === "pot" ? sheetGoalPot(g) : sheetGoal(g) }); }
   if (act === "pot-add") return potAdd(t);
+  if (act === "watch-new") return openSheet({ html: sheetWatch() });
+  if (act === "watch-edit") { const w = R.watch.find((x) => x.id === id); return w && openSheet({ html: sheetWatch(w) }); }
+  if (act === "watch-idea") { try { return openSheet({ html: sheetWatch(JSON.parse(t.dataset.idea)) }); } catch { return; } }
+  if (act === "watch-del") { if (t.dataset.confirm !== "1") { t.dataset.confirm = "1"; t.textContent = "Confirmer la suppression"; return; } t.disabled = true; try { await db.collection("watch").doc(id).delete(); closeSheet(); } catch (err) { showErr(err); t.disabled = false; } return; }
   if (act === "open-account") openSheet({ type: "account", id, live: true });
   else if (act === "open-property") openSheet({ type: "property", id, live: true });
   else if (act === "monthly") openSheet({ html: sheetMonthly() });
@@ -2697,6 +2772,7 @@ document.addEventListener("submit", async (e) => {
   if (kind === "alloc") return saveAlloc(form);
   if (kind === "goalx") return saveGoalX(form);
   if (kind === "goal") return saveGoal(form);
+  if (kind === "watch") return saveWatch(form);
   const data = readForm(form);
   if (kind === "holding") data.accountId = parent;
   if (kind === "loan") data.propertyId = parent;
