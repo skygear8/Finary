@@ -2440,7 +2440,8 @@ async function challengeAct(act, t) {
 const IR = { tr: [[11600, 0], [29579, 0.11], [84577, 0.3], [181917, 0.41], [Infinity, 0.45]], qf: 1807, decote: { s: [1982, 897], c: [3277, 1483] }, abatMin: 504, abatMax: 14426 };
 function irBrut(rni, parts) { const q = rni / parts; let t = 0, lo = 0; for (const [hi, r] of IR.tr) { if (q > lo) t += (Math.min(q, hi) - lo) * r; lo = hi; } return t * parts; }
 function irCalc(revs, couple, per = 0) {
-  const net = revs.map((r) => Math.max(0, r - Math.min(IR.abatMax, Math.max(IR.abatMin, r * 0.1))));
+  // saisie « avant abattement » (salaires) ou déjà en net imposable (comme sur l'avis d'impôt et les simulateurs en ligne)
+  const net = setOf("tax").gross ? revs.map((r) => Math.max(0, r - Math.min(IR.abatMax, Math.max(IR.abatMin, r * 0.1)))) : revs.map((r) => Math.max(0, r));
   const one = (rni, parts, cpl) => { let t = irBrut(Math.max(0, rni), parts); const [lim, base] = cpl ? IR.decote.c : IR.decote.s; if (t <= lim) t = Math.max(0, t - Math.max(0, base - 0.4525 * t)); return Math.round(t); };
   const tmi = (rni, parts) => { const q = rni / parts; let r0 = 0; for (const [hi, r] of IR.tr) { r0 = r; if (q <= hi) break; } return r0; };
   if (couple) { const rni = net.reduce((a, b) => a + b, 0) - per; return { total: one(rni, 2, true), tmi: tmi(rni, 2), each: null }; }
@@ -2454,9 +2455,9 @@ function perSection(P) {
   if (profile !== "nathan" && profile !== "angelique") return "";
   const st = setOf("tax"), other = profile === "nathan" ? "angelique" : "nathan";
   const salary = (k) => withProfile(k, () => { const D = withScope("perso", budgetData), now = curMonth(); const ms = [...new Set(D.tx.map((t) => ym(t.date)))].filter((m) => m < now).sort().slice(-3); return ms.length ? Math.round(ms.reduce((s, m) => s + D.tx.filter((t) => ym(t.date) === m && t.c === "salaire").reduce((x, t) => x + t.amount, 0), 0) / ms.length * 12) : 0; });
-  const me = st[profile] ?? salary(profile), them = st[other] ?? salary(other);
+  const ab = (v) => st.gross ? v : Math.round(v * 0.9), me = st[profile] ?? ab(salary(profile)), them = st[other] ?? ab(salary(other));
   if (!me) return `<details class="section fold" data-fold="per" ${openFolds.has("per") ? "open" : ""}><summary><span class="fold-t"><h2>Simulateur PER</h2><span class="note">renseigne tes revenus dans « Impôt sur le revenu »</span></span><b></b></summary></details>`;
-  const plaf = Math.max(4710, Math.round((me - Math.min(IR.abatMax, Math.max(IR.abatMin, me * 0.1))) * 0.1));
+  const plaf = Math.max(4710, Math.round((st.gross ? me - Math.min(IR.abatMax, Math.max(IR.abatMin, me * 0.1)) : me) * 0.1));
   const amt = perSim ?? Math.min(plaf, 1200), revs = [me, them], couple = !!st.couple;
   const base = irCalc(revs, couple, 0), withP = irCalc(revs, couple, amt), save = Math.max(0, base.total - withP.total);
   const by = setOf(profile).birthYear, years = by ? Math.max(1, 64 - (new Date().getFullYear() - by)) : 25, fv = (a) => a * Math.pow(1.05, years);
@@ -2475,11 +2476,12 @@ document.addEventListener("input", (e) => { if (e.target.id !== "per-sim") retur
 function taxIRSection(P) {
   if (profile === "sci") return "";
   const st = setOf("tax"), keep = (k) => withProfile(k, () => { const D = withScope("perso", budgetData), now = curMonth(); const ms = [...new Set(D.tx.map((t) => ym(t.date)))].filter((m) => m < now).sort().slice(-3); return ms.length ? Math.round(ms.reduce((s, m) => s + D.tx.filter((t) => ym(t.date) === m && t.c === "salaire").reduce((a, t) => a + t.amount, 0), 0) / ms.length * 12) : 0; });
-  const rn = st.nathan ?? keep("nathan"), ra = st.angelique ?? keep("angelique"), per = st.per || 0;
+  const ab = (v) => st.gross ? v : Math.round(v * 0.9), rn = st.nathan ?? ab(keep("nathan")), ra = st.angelique ?? ab(keep("angelique")), per = st.per || 0;
   const sep = irCalc([rn, ra], false, 0), cpl = irCalc([rn, ra], true, 0), perC = per ? irCalc([rn, ra], !!st.couple, per) : null, base = st.couple ? cpl : sep;
   const inp = (k, v, ph) => `<input class="inl" data-tax="${k}" inputmode="decimal" value="${v || ""}" placeholder="${ph || ""}" ${S.writable ? "" : "disabled"}>`;
   return `<details class="section fold" data-fold="ir" ${openFolds.has("ir") ? "open" : ""}><summary><span class="fold-t"><h2>Impôt sur le revenu estimé</h2><span class="note">${st.couple ? "pacsés ou mariés" : "deux déclarations séparées"} · barème 2026</span></span><b>${fE(base.total)}<small> /an</small></b></summary>
-    <div class="panel kv"><div class="strong"><span>Revenus nets imposables annuels</span><span></span></div>
+    <div class="panel kv"><div class="strong"><span>Revenus annuels</span><span></span></div>
+      <div><span>Montants saisis</span><span><select class="inl" data-tax="gross" ${S.writable ? "" : "disabled"}><option value="0" ${!st.gross ? "selected" : ""}>Net imposable (après abattement)</option><option value="1" ${st.gross ? "selected" : ""}>Salaires nets, avant abattement de 10 %</option></select></span></div>
       <div><span>Nathan${st.nathan == null && rn ? ' <small class="note">· salaire du Budget × 12</small>' : ""}</span><span>${inp("nathan", st.nathan ?? "", rn ? String(rn) : "à renseigner")}</span></div>
       <div><span>Angélique${st.angelique == null && ra ? ' <small class="note">· salaire du Budget × 12</small>' : ""}</span><span>${inp("angelique", st.angelique ?? "", ra ? String(ra) : "à renseigner")}</span></div>
       <div><span>Versement PER prévu (déductible)</span><span>${inp("per", st.per ?? "", "0")}</span></div>
@@ -2490,12 +2492,12 @@ function taxIRSection(P) {
       <div class="strong"><span>${cpl.total < sep.total ? "Le PACS ferait économiser" : cpl.total > sep.total ? "Le PACS coûterait" : "Le PACS ne change rien"}</span><span class="${cpl.total < sep.total ? "gain" : cpl.total > sep.total ? "loss" : ""}">${fE(Math.abs(sep.total - cpl.total))}/an</span></div>
       <div><span>Tranche marginale ${st.couple ? "du couple" : "de Nathan"}</span><span>${fP(base.tmi * 100, 0)}</span></div>
       ${perC ? `<div class="strong"><span>Avec ${fE(per)} versés sur un PER</span><span class="gain">−${fE(base.total - perC.total)}</span></div>` : `<div><span class="note">Un versement sur un PER réduit l'impôt d'environ ${fP(base.tmi * 100, 0)} du montant versé (ta tranche marginale), dans la limite de 10 % de tes revenus.</span></div>`}</div>
-    <p class="note" style="margin-top:6px">Estimation : abattement de 10 % sur les salaires, barème 2026 (revenus 2025) avec décote, sans réductions ni crédits d'impôt. Le salaire du Budget est un net payé, un peu plus bas que le net imposable : corrige-le avec ton avis d'impôt.</p></details>`;
+    <p class="note" style="margin-top:6px">Estimation : ${st.gross ? "abattement de 10 % appliqué aux salaires saisis" : "montants saisis en net imposable (déjà après l'abattement de 10 %, comme sur l'avis d'impôt)"}, barème 2026 (revenus 2025) avec décote, sans réductions ni crédits d'impôt. Le salaire du Budget est un net payé, un peu plus bas que le net imposable : corrige-le avec ton avis d'impôt.</p></details>`;
 }
 document.addEventListener("change", async (e) => {
   const k = e.target.dataset?.tax; if (!k) return;
   openFolds.add("ir");
-  const v = k === "couple" ? e.target.value === "1" : String(e.target.value).trim() === "" ? null : num(e.target.value);
+  const v = k === "couple" || k === "gross" ? e.target.value === "1" : String(e.target.value).trim() === "" ? null : num(e.target.value);
   try { await saveSet("tax", { [k]: v }); } catch (err) { showErr(err); }
 });
 
