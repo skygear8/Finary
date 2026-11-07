@@ -1644,7 +1644,16 @@ function taxSection(P) {
   const PFU = 31.4, PS = 18.6, now = new Date();
   const gain = (a) => a.hs.reduce((s, h) => s + h.qty * (h.price - h.pru), 0);
   const peas = P.accRows.filter((a) => a.type === "pea"), ctos = P.accRows.filter((a) => a.type === "cto" || a.type === "crypto"), avs = P.accRows.filter((a) => a.type === "assurance_vie"), livs = P.accRows.filter((a) => a.type === "livret");
-  const ctoGain = ctos.reduce((s, a) => s + Math.max(0, gain(a)), 0), ctoTax = ctoGain * PFU / 100;
+  // les moins-values d'un compte-titres compensent les plus-values des autres (même foyer fiscal, même année)
+  const ctoGain = ctos.reduce((s, a) => s + gain(a), 0), ctoTax = Math.max(0, ctoGain) * PFU / 100;
+  const ctoLines = ctos.flatMap((a) => a.hs.map((h) => ({ n: h.name, g: h.qty * (h.price - h.pru) }))).filter((l) => Math.abs(l.g) >= 1).sort((x, y) => Math.abs(y.g) - Math.abs(x.g));
+  // PEA et assurance-vie : gain imposable au retrait = valeur − versements (sinon d'après les PRU)
+  const envGain = (a) => a.deposits > 0 ? a.value - a.deposits : gain(a);
+  const fiveOk = (a) => { if (!a.openedAt) return false; const d = new Date(a.openedAt); d.setFullYear(d.getFullYear() + 5); return d <= now; };
+  const eightOk = (a) => { if (!a.openedAt) return false; const d = new Date(a.openedAt); d.setFullYear(d.getFullYear() + 8); return d <= now; };
+  const peaGain = peas.reduce((s, a) => s + envGain(a), 0), peaTax = peas.reduce((s, a) => s + Math.max(0, envGain(a)) * (fiveOk(a) ? PS : PFU) / 100, 0);
+  const avGain = avs.reduce((s, a) => s + envGain(a), 0), avTax = avs.reduce((s, a) => { const g = Math.max(0, envGain(a)); return s + (eightOk(a) ? g * PS / 100 + Math.max(0, g - 4600) * 7.5 / 100 : g * PFU / 100); }, 0);
+  const crypNo = ctos.filter((a) => a.type === "crypto" && !a.hs.length && a.value > 0);
   const livInt = livs.reduce((s, a) => s + a.value * ((a.rate ?? 1.7) / 100), 0);
   const peaRow = (a) => {
     if (!a.openedAt) return `<div><span>${esc(a.name)} <small class="note">${esc(a.institution || "")}</small></span><span class="note">date d'ouverture inconnue</span></div>`;
@@ -1657,14 +1666,19 @@ function taxSection(P) {
     const eight = new Date(a.openedAt); eight.setFullYear(eight.getFullYear() + 8);
     return `<div><span>${esc(a.name)} <small class="note">ouvert le ${new Date(a.openedAt).toLocaleDateString("fr-FR")}</small></span><span>${eight <= now ? '<b class="gain">8 ans atteints</b>' : "8 ans le " + eight.toLocaleDateString("fr-FR")}</span></div>`;
   };
-  return `<details class="section fold"><summary><span class="fold-t"><h2>Fiscalité</h2><span class="note">PEA, compte-titres, assurance-vie, livrets</span></span><b>${ctoTax ? fE(ctoTax) + "<small> si tu vends</small>" : "—"}</b></summary>
+  return `<details class="section fold"><summary><span class="fold-t"><h2>Fiscalité</h2><span class="note">PEA, compte-titres, assurance-vie, livrets</span></span><b>${ctoTax + peaTax + avTax ? fE(ctoTax + peaTax + avTax) + "<small> si tu vends tout</small>" : "—"}</b></summary>
     ${peas.length ? `<div class="panel kv"><div class="strong"><span>PEA : l'horloge des 5 ans</span><span></span></div>${peas.map(peaRow).join("")}
+      <div><span>Plus-values latentes <small class="note">valeur − versements</small></span><span class="${tone(peaGain)}">${fE(peaGain)}</span></div>
+      <div><span>Impôt si tu retirais tout aujourd'hui</span><span>${fE(peaTax)}</span></div>
       <div><span class="note">Avant 5 ans, un retrait clôture le PEA et les gains sont taxés à ${fP(PFU, 1)}. Après 5 ans, seuls les prélèvements sociaux (${fP(PS, 1)}) restent dus sur les gains.</span></div></div>` : ""}
     ${ctos.length ? `<div class="panel kv"><div class="strong"><span>Compte-titres et crypto</span><span></span></div>
-      <div><span>Plus-values latentes</span><span class="${tone(ctoGain)}">${fE(ctoGain)}</span></div>
+      ${ctoLines.slice(0, 6).map((l) => `<div><span>${esc(l.n)}</span><span class="${tone(l.g)}">${l.g >= 0 ? "+" : "−"}${fE(Math.abs(l.g))}</span></div>`).join("")}
+      <div class="strong"><span>Plus-values latentes nettes${ctoLines.some((l) => l.g < 0) ? ' <small class="note">moins-values déduites</small>' : ""}</span><span class="${tone(ctoGain)}">${fE(ctoGain)}</span></div>
       <div><span>Impôt si tu vendais tout aujourd'hui (flat tax ${fP(PFU, 1)})</span><span>${fE(ctoTax)}</span></div>
-      <div><span class="note">Les moins-values se déduisent des plus-values de l'année et des 10 années suivantes. Les cryptos sont exonérées sous 305 € de cessions par an.</span></div></div>` : ""}
+      <div><span class="note">Les moins-values se déduisent des plus-values de l'année et des 10 années suivantes. Les cryptos sont exonérées sous 305 € de cessions par an.${crypNo.length ? " Crypto non comptée : le détail des achats (prix de revient) n'est pas saisi." : ""}</span></div></div>` : ""}
     ${avs.length ? `<div class="panel kv"><div class="strong"><span>Assurance-vie : l'horloge des 8 ans</span><span></span></div>${avs.map(avRow).join("")}
+      <div><span>Plus-values latentes <small class="note">valeur − versements</small></span><span class="${tone(avGain)}">${fE(avGain)}</span></div>
+      <div><span>Impôt si tu retirais tout aujourd'hui</span><span>${fE(avTax)}</span></div>
       <div><span class="note">Après 8 ans, les gains retirés bénéficient d'un abattement de 4 600 € par an (9 200 € pour un couple marié ou pacsé).</span></div></div>` : ""}
     ${livs.length ? `<div class="panel kv"><div class="strong"><span>Livrets réglementés</span><span></span></div>
       <div><span>Intérêts estimés sur un an</span><span class="gain">${fE(livInt)}</span></div>
