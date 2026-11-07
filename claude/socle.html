@@ -388,6 +388,38 @@ details.fold > summary .note b { font-family: var(--font-body); font-weight: 700
 .gauge { position: relative; height: 10px; border-radius: 99px; background: linear-gradient(90deg, var(--loss), color-mix(in srgb, var(--muted) 40%, transparent) 50%, var(--gain)); margin: 6px 4px 0; }
 .gauge i { position: absolute; top: 50%; width: 18px; height: 18px; border-radius: 99px; background: var(--surface); border: 3px solid var(--fg); transform: translate(-50%, -50%); }
 .gauge-l { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); margin-top: 8px; }
+/* ---- Ordinateur : menu latéral, deux colonnes, fiches en panneau à droite ---- */
+@media (min-width: 1100px) {
+  body { font-size: 15.5px; }
+  .tabs { top: 0; bottom: 0; left: 0; right: auto; transform: none; width: 232px; box-shadow: none; border-left: 0; border-top: 0; border-bottom: 0; border-top: 0; border-right: 1px solid var(--line); border-radius: 0; padding: 22px 14px 24px; background: var(--surface); backdrop-filter: none; display: flex; flex-direction: column; gap: 18px; }
+  .tabs::before { content: "Socle"; font-family: var(--font-display); font-size: 22px; font-weight: 600; padding: 4px 14px 10px; color: var(--fg); }
+  .tabs nav { display: flex; flex-direction: column; gap: 4px; max-width: none; margin: 0; }
+  .tab { grid-auto-flow: column; justify-content: start; align-items: center; gap: 12px; font-size: 14.5px; font-weight: 600; padding: 11px 14px; border-radius: 14px; }
+  .tab svg { width: 20px; height: 20px; }
+  .tab:not([aria-current="page"]):hover { background: var(--sunk); color: var(--fg); }
+  .wrap { max-width: none; margin: 0 0 0 232px; padding-left: 44px; padding-right: 44px; padding-block: 18px 56px; }
+  .wrap > * { max-width: 1240px; margin-inline: auto; }
+  .brand b { visibility: hidden; }
+  .brand { margin-bottom: -36px; position: relative; z-index: 16; justify-content: flex-end; pointer-events: none; }
+  .brand .head-r { pointer-events: auto; }
+  .pbar { margin-inline: auto; padding-inline: 0; }
+  .pbar .profiles { max-width: 520px; }
+  .hero .big { font-size: 60px; }
+  .toprow { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 16px; align-items: stretch; margin-top: 10px; }
+  .toprow > .hero { margin: 0; }
+  .toprow > .grid2 { margin: 0; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: 1fr; }
+  .toprow > .grid2 .tile { display: grid; align-content: center; }
+  .cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0 28px; align-items: start; }
+  .col { min-width: 0; display: grid; align-content: start; }
+  .col > :first-child { margin-top: 22px; }
+  .sheet { left: auto; right: 0; top: 0; bottom: 0; width: 520px; max-height: none; transform: none; border-radius: 26px 0 0 26px; padding-block: 18px 28px; padding-inline: 28px; box-shadow: -20px 0 60px rgb(0 0 0 / .12); }
+  .sheet .grab { display: none; }
+  .scrim { background: rgb(0 0 0 / 0.22); }
+}
+@media (min-width: 1100px) and (prefers-reduced-motion: no-preference) {
+  .sheet { animation: side 0.22s ease-out; }
+  @keyframes side { from { transform: translateX(32px); opacity: .6; } }
+}
 </style>
 
 <div class="wrap">
@@ -2683,12 +2715,35 @@ function eyeIcon() {
 }
 setTimeout(eyeIcon, 0);
 const $ = (s) => document.querySelector(s);
+
+// ordinateur : regroupe les blocs de la vue en deux colonnes équilibrées (le téléphone garde une seule colonne)
+const DESK = window.matchMedia("(min-width: 1100px)");
+function deskLayout() {
+  const v = $("#view"); if (!v || !DESK.matches) return;
+  const kids = [...v.children], full = (e) => e.matches(".hero, .grid2, .seg, .section-head, .add, div.section, .toprow") || e.getBoundingClientRect().height > 900;
+  const hero = kids[0]; if (hero?.matches(".hero") && kids[1]?.matches(".grid2")) { const t = document.createElement("div"); t.className = "toprow"; hero.before(t); t.append(hero, kids[1]); }
+  let buf = [];
+  const flush = (before) => {
+    if (buf.length < 2) { buf = []; return; }
+    const box = document.createElement("div"); box.className = "cols"; const cs = [document.createElement("div"), document.createElement("div")], h = [0, 0];
+    cs.forEach((c) => (c.className = "col"));
+    const hs = buf.map((e) => e.getBoundingClientRect().height);
+    if (before) before.before(box); else v.append(box);
+    buf.forEach((e, i) => { const k = h[0] <= h[1] ? 0 : 1; cs[k].append(e); h[k] += hs[i] + 22; });
+    box.append(...cs); buf = [];
+  };
+  for (const e of [...v.children]) { if (full(e)) flush(e); else buf.push(e); }
+  flush(null);
+}
+let deskWas = DESK.matches;
+DESK.addEventListener?.("change", () => { if (DESK.matches !== deskWas) { deskWas = DESK.matches; render(); } });
 function render() {
   applyProfile();
   const P = portfolio();
   const pb = document.getElementById("profiles");
   if (pb) pb.innerHTML = PROFILES.map((p) => `<button role="tab" class="prof" aria-selected="${p.k === profile}" data-profile="${p.k}"><span class="av-s">${p.k === "foyer" ? "∞" : p.label.charAt(0)}</span>${p.label}</button>`).join("");
   $("#view").innerHTML = tab === "comptes" ? viewComptes(P) : tab === "positions" ? viewPositions(P) : tab === "immobilier" ? viewImmo(P) : tab === "budget" ? viewBudget() : tab === "marches" ? viewMarket(P) : viewSynthese(P);
+  deskLayout();
   document.querySelectorAll(".tab").forEach((t) => t.setAttribute("aria-current", t.dataset.tab === tab ? "page" : "false"));
   if (sheet && sheet.live) openSheet(sheet, true);
   else if (pendingOpen) openPending();
