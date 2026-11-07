@@ -426,6 +426,27 @@ details.fold > summary .note b { font-family: var(--font-body); font-weight: 700
   .sheet { animation: side 0.22s ease-out; }
   @keyframes side { from { transform: translateX(32px); opacity: .6; } }
 }
+/* onglets supplémentaires : menu « Plus » sur téléphone, tous visibles sur ordinateur */
+.tab.x-tab { display: none; }
+.more-list .row .txl { display: flex; align-items: center; gap: 12px; font-weight: 600; }
+.more-list .row svg { width: 20px; height: 20px; color: var(--accent); }
+.kv .dec { align-items: start; gap: 12px; }
+.kv .dec > span:first-child { display: grid; gap: 2px; min-width: 0; }
+.kv .dec > span:last-child { white-space: normal !important; max-width: 46%; }
+@media (max-width: 640px) { .kv .dec { flex-direction: column; align-items: stretch; } .kv .dec > span:last-child { max-width: none; text-align: left !important; justify-self: start; align-self: flex-start; } }
+.pill { font-size: 12px; font-weight: 600; background: color-mix(in srgb, var(--accent) 10%, transparent); color: var(--accent); border-radius: 10px; padding: 4px 8px; text-align: right; }
+.txl:has(.cal-chip) { grid-template-columns: 46px minmax(0, 1fr); gap: 12px; }
+.crow { display: grid; grid-template-columns: 10px minmax(0, 1fr) auto auto; gap: 4px 10px; align-items: center; padding: 8px 2px; }
+.crow .bar { grid-column: 2 / -1; }
+.crow small { min-width: 34px; text-align: right; }
+.cal-chip { display: grid; place-items: center; width: 46px; height: 46px; flex: none; border-radius: 12px; background: color-mix(in srgb, var(--accent) 10%, transparent); color: var(--accent); font-size: 11px; line-height: 1.1; text-transform: uppercase; }
+.cal-chip b { font-size: 17px; font-family: var(--font-display); }
+.split { height: 6px; border-radius: 99px; background: color-mix(in srgb, var(--gold) 70%, transparent); margin: 12px 0 18px; overflow: hidden; }
+.split i { display: block; height: 100%; background: var(--accent); }
+@media (min-width: 1100px) {
+  .tab.x-tab { display: grid; }
+  .tab.plus { display: none; }
+}
 </style>
 
 <div class="wrap">
@@ -444,7 +465,11 @@ details.fold > summary .note b { font-family: var(--font-body); font-weight: 700
     <button class="tab" data-tab="positions"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 18 9 12l4 3 7-8"/><path d="M15 7h5v5"/></svg>Positions</button>
     <button class="tab" data-tab="immobilier"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 11 12 4l9 7M5.5 9.5V20h13V9.5M10 20v-5h4v5"/></svg>Immobilier</button>
     <button class="tab" data-tab="budget"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7.5A2.5 2.5 0 0 1 6.5 5H18v4"/><rect x="3.5" y="8" width="17" height="11" rx="2.5"/><path d="M16 13.5h1.5"/></svg>Budget</button>
-    <button class="tab" data-tab="marches"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8.5"/><path d="m15.5 8.5-2 5-5 2 2-5z"/></svg>Marchés</button>
+    <button class="tab x-tab" data-tab="marches"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8.5"/><path d="m15.5 8.5-2 5-5 2 2-5z"/></svg>Marchés</button>
+      <button class="tab x-tab" data-tab="fiscalite"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M7 3.5h7l4 4V20.5H7z"/><path d="M14 3.5v4h4M10 12.5h5M10 16h5"/></svg>Fiscalité</button>
+    <button class="tab x-tab" data-tab="objectifs"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="1" fill="currentColor"/></svg>Objectifs</button>
+    <button class="tab x-tab" data-tab="couple"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="9" cy="8.5" r="3"/><circle cx="16.5" cy="9.5" r="2.5"/><path d="M3.5 19c.6-3.2 2.8-5 5.5-5s4.9 1.8 5.5 5M14.5 14.3c2.6-.4 5 1.1 5.8 4.2"/></svg>Couple</button>
+    <button class="tab plus" data-act="more-tabs"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="6" cy="12" r="1.4" fill="currentColor"/><circle cx="12" cy="12" r="1.4" fill="currentColor"/><circle cx="18" cy="12" r="1.4" fill="currentColor"/></svg>Plus</button>
   </nav>
 </div>
 
@@ -675,7 +700,6 @@ function viewSynthese(P) {
   </div>
   <div class="section"><div class="panel monthly"><span><b>Mise à jour du mois</b><div class="note">${lastUpdateText()}</div></span><button class="btn" data-act="monthly">Mettre à jour</button></div></div>
   ${stack("En un coup d'œil", [healthSection(P), agendaSection(P)])}
-  ${goalsSection(P)}
   <section class="section">
     <h2>Répartition</h2>
     <div class="panel alloc">${donut(P.alloc)}<div class="legend">${P.alloc.map((a) => `<div><span class="dot" style="background:var(--c-${a.key})"></span><span>${a.label}</span><span class="pct">${fP((a.value / P.assets) * 100, 1)}</span><b>${fE(a.value)}</b></div>`).join("")}</div></div>
@@ -694,9 +718,112 @@ function viewSynthese(P) {
   </section>
   <div class="section-head" style="margin-top:30px"><h2 class="h-lg">Analyses</h2></div>
   ${profile === "sci" ? "" : `<div class="seg acts" style="margin-top:10px"><button class="seg-b" data-act="sim">Et si j'achète ?</button><button class="seg-b" data-act="year">Bilan de l'année</button></div>`}
-  ${stack("Ton avenir", [projSection(P), fireSection(P)])}
-  ${stack("Performance", [benchSection(P), ytdTable(P), costTable(P), passiveSection(P), rebalSection(P)])}
-  ${stack("Frais et impôts", [feesTable(P), taxSection(P), taxIRSection(P), perSection(P)])}`;
+  ${stack("Performance", [benchSection(P), ytdTable(P), costTable(P), passiveSection(P), rebalSection(P), feesTable(P)])}`;
+}
+/* ---------------- Onglets Fiscalité, Objectifs, Couple ---------------- */
+// pays des établissements étrangers : comptes à déclarer chaque année (formulaire 3916, 3916-bis pour la crypto)
+const FOREIGN = [[/trade republic/i, "Allemagne"], [/revolut/i, "Lituanie"], [/xtb/i, "Pologne"], [/bitpanda/i, "Autriche"], [/binance/i, "étranger"], [/degiro/i, "Pays-Bas"], [/interactive brokers|ibkr/i, "Irlande"], [/n26/i, "Allemagne"], [/wise/i, "Belgique"], [/scalable/i, "Allemagne"], [/bourse direct|boursobank|fortuneo|swisslife|epsor|credit agricole|lcl|bnp|societe generale|caisse d'epargne/i, null]];
+const foreignOf = (a) => { for (const [re, c] of FOREIGN) if (re.test(`${a.institution || ""} ${a.name || ""}`)) return c; return null; };
+function declarationSection(P) {
+  const ir = irNow(), rows = [];
+  const who = profile === "angelique" ? "Angélique" : profile === "nathan" ? "Nathan" : "chacun";
+  rows.push(["Salaires", "1AJ (déclarant 1) · 1BJ (déclarant 2)", "Prérempli : vérifie avec le cumul « net imposable » de ta fiche de paie de décembre."]);
+  const ctos = P.accRows.filter((a) => a.type === "cto");
+  if (ctos.length) {
+    rows.push(["Dividendes et intérêts du compte-titres", "2DC (dividendes) · 2TR (intérêts) · 2CK (acompte déjà prélevé)", "Recopie l'IFU envoyé par le courtier en février-mars. Les banques françaises préremplissent, pas toujours les étrangères."]);
+    rows.push(["Ventes d'actions avec plus ou moins-value", "3VG (gain) · 3VH (perte)", "Seulement l'année où tu vends. Les pertes se reportent 10 ans : garde le montant d'une année sur l'autre."]);
+  }
+  if (P.accRows.some((a) => a.type === "per") || ir.st.per) rows.push(["Versements sur un PER", "6NS (déclarant 1) · 6NT (déclarant 2)", "Déductibles du revenu, dans la limite du plafond indiqué sur ton avis d'impôt."]);
+  if (P.accRows.some((a) => a.type === "assurance_vie")) rows.push(["Assurance-vie", "Rien tant que tu ne retires pas", "En cas de retrait : la part de gains figure sur l'IFU de l'assureur (cases 2CH, 2YY ou 2ZZ selon l'ancienneté)."]);
+  if (P.accRows.some((a) => a.type === "pea")) rows.push(["PEA", "Rien tant que tu ne retires pas", "Les dividendes réinvestis dans le PEA ne se déclarent pas."]);
+  if (P.accRows.some((a) => a.type === "crypto")) rows.push(["Crypto vendue contre des euros", "3AN (gain) · 3BN (perte), formulaire 2086", "Exonéré si le total des ventes de l'année reste sous 305 €. Un échange crypto contre crypto n'est pas imposé."]);
+  if (P.partRows.length || profile === "sci") rows.push(["Parts de la SCI", "4BA (revenus fonciers) si la SCI est à l'IR", "À partir des loyers 2027 : la SCI te communique ta quote-part (formulaire 2072). Rien pour 2026."]);
+  const abroad = P.accRows.map((a) => ({ a, c: foreignOf(a) })).filter((x) => x.c);
+  const ab = abroad.length ? `<div class="panel kv" style="margin-top:10px"><div class="strong"><span>Comptes à l'étranger à déclarer</span><span>formulaire 3916</span></div>
+    ${abroad.map(({ a, c }) => `<div><span>${esc(a.name)} <small class="note">${esc(a.institution || "")}</small></span><span>${c}${a.type === "crypto" ? " · 3916-bis" : ""}</span></div>`).join("")}
+    <div><span class="note">Obligatoire même s'ils ne rapportent rien, chaque année tant qu'ils sont ouverts. Oubli : 1 500 € d'amende par compte. Coche aussi la case 8UU.</span></div></div>` : "";
+  return `<section class="section"><div class="section-head"><h2>Aide-mémoire de déclaration</h2><span class="note">revenus 2026, à déclarer au printemps 2027 · ${who}</span></div>
+    <div class="panel kv">${rows.map(([t, c, n]) => `<div class="dec"><span><b>${t}</b><small class="note">${n}</small></span><span class="pill">${c}</span></div>`).join("")}</div>${ab}</section>`;
+}
+function fiscalCalendar(P) {
+  const y = new Date().getFullYear(), now = new Date();
+  const t = taxCalc(P), losses = t.ctoLines.filter((l) => l.g < 0).reduce((s, l) => s + l.g, 0);
+  const ev = [
+    [`${y}-12-31`, "Dernier jour pour un versement PER déductible", "et pour vendre une ligne en perte si tu veux l'imputer sur les gains de l'année" + (losses < -1 ? ` (pertes latentes actuelles : ${fE(-losses)})` : "")],
+    [`${y + 1}-02-28`, "IFU des courtiers et assureurs", "récapitulatif des dividendes, intérêts et ventes de l'année"],
+    [`${y + 1}-04-10`, "Ouverture de la déclaration en ligne", "dates exactes publiées au printemps sur impots.gouv.fr"],
+    [`${y + 1}-05-28`, "Date limite de déclaration (approximative)", "elle varie selon le département, de fin mai à début juin"],
+    [`${y + 1}-07-25`, "Avis d'impôt", "et ajustement du taux de prélèvement à la source en septembre"],
+    [`${y + 1}-10-15`, "Taxe foncière", "concerne la SCI après la signature de l'acte"],
+  ].filter(([d]) => new Date(d) >= new Date(now.toDateString()));
+  return `<section class="section"><div class="section-head"><h2>Calendrier fiscal</h2><span class="note">dates repères</span></div>
+    <div class="panel list">${ev.map(([d, h, n]) => `<div class="row" style="cursor:default"><span class="txl"><span class="cal-chip"><b>${new Date(d).getDate()}</b>${new Date(d).toLocaleDateString("fr-FR", { month: "short" }).replace(".", "")}</span><span style="min-width:0"><div class="name">${h}</div><div class="meta">${n}</div></span></span></div>`).join("")}</div></section>`;
+}
+function viewFiscal(P) {
+  if (profile === "sci") return `<section class="hero"><div class="eyebrow">Fiscalité</div><div class="big" style="font-size:28px">Voir les profils Nathan, Angélique ou Foyer</div></section>`;
+  const ir = irNow(), t = taxCalc(P), lat = t.ctoTax + t.peaTax + t.avTax, diff = ir.sep.total - ir.cpl.total;
+  return `<section class="hero"><div class="eyebrow">Impôt sur le revenu estimé</div><div class="big">${fE(ir.base.total)}<small style="font-size:18px"> /an</small></div>
+      <div class="sub">${ir.st.couple ? "déclaration commune" : "deux déclarations séparées"} · barème 2026${ir.sep.each && !ir.st.couple ? ` · Nathan ${fE(ir.sep.each[0])}, Angélique ${fE(ir.sep.each[1])}` : ""}</div></section>
+    <div class="grid2 grid4">
+      ${tile("Tranche marginale", fP(ir.base.tmi * 100, 0), ir.st.couple ? "du couple" : "de Nathan")}
+      ${tile(diff >= 0 ? "Gain d'un PACS" : "Coût d'un PACS", fE(Math.abs(diff)) + "<small style='font-size:12px;font-weight:500'> /an</small>", "déclaration commune", diff >= 0 ? "gain" : "loss")}
+      ${tile("Impôt si tu vendais tout", fE(lat), "compte-titres, PEA, assurance-vie")}
+      ${tile("Intérêts exonérés", fE(t.livInt), "livrets réglementés sur un an", "gain")}
+    </div>
+    ${stack("Impôt sur le revenu", [taxIRSection(P), perSection(P)])}
+    ${stack("Tes placements", [taxSection(P)])}
+    ${declarationSection(P)}
+    ${fiscalCalendar(P)}
+    <p class="note" style="margin-top:14px">Repères généraux (règles 2026), pas un conseil fiscal personnalisé.</p>`;
+}
+function viewGoals(P) {
+  if (profile === "sci") return `<section class="hero"><div class="eyebrow">Objectifs</div><div class="big" style="font-size:28px">Voir les profils Nathan, Angélique ou Foyer</div></section>`;
+  const goals = R.goals.filter((g) => profile === "foyer" || g.profile === profile || g.profile === "foyer");
+  const av = avgSaving(), pace = av ? av.save : 0;
+  const done = goals.filter((g) => { if (g.kind && g.kind !== "accounts") return false; const cur = P.accRows.filter((a) => (g.accounts || []).includes(a.id)).reduce((s, a) => s + a.value, 0); return g.target && cur >= g.target; }).length;
+  const fx = fixedCharges(), liq = P.accRows.filter((a) => a.type === "livret" || a.type === "courant").reduce((s, a) => s + a.value, 0);
+  return `<section class="hero"><div class="eyebrow">Objectifs</div><div class="big">${goals.length ? `${goals.length}<small style="font-size:18px;font-family:var(--font-body)"> objectif${goals.length > 1 ? "s" : ""}</small>` : "À définir"}</div>
+      <div class="sub">${done ? `${done} atteint${done > 1 ? "s" : ""} · ` : ""}chaque objectif indique sa date d'arrivée au rythme actuel et le versement mensuel nécessaire</div></section>
+    <div class="grid2 grid4">
+      ${tile("Épargne nette", av ? fE(pace) + "<small style='font-size:12px;font-weight:500'> /mois</small>" : "—", av ? "moyenne des derniers mois" : "importe tes relevés", pace >= 0 ? "" : "loss")}
+      ${tile("Épargne disponible", fE(liq), "livrets et comptes courants")}
+      ${tile("Charges fixes", fx ? fE(fx.total) + "<small style='font-size:12px;font-weight:500'> /mois</small>" : "—", fx && fx.total ? `réserve de ${(liq / fx.total).toFixed(1).replace(".", ",")} mois` : "")}
+      ${tile("Patrimoine net", fE(P.net), "point de départ")}
+    </div>
+    ${goalsSection(P)}
+    ${stack("Ton avenir", [projSection(P), fireSection(P)])}`;
+}
+function viewCouple() {
+  const port = (k) => withProfile(k, () => portfolio());
+  const pn = port("nathan"), pa = port("angelique"), pf = port("foyer");
+  const D = withScope("all", () => withProfile("foyer", budgetData)), jt = D.tx.filter((t) => t.accountId === "joint");
+  const months = [...new Set(jt.map((t) => ym(t.date)))].sort(), last = months.filter((m) => m < curMonth()).pop() || months[months.length - 1];
+  const ir = irNow(), diff = ir.sep.total - ir.cpl.total;
+  const jointBal = D.jointBal * 2;
+  // dépenses communes du dernier mois complet, par catégorie (remboursements déduits)
+  const lm = jt.filter((t) => ym(t.date) === last && t.c !== "interne"), byC = {};
+  for (const t of lm) byC[t.c] = (byC[t.c] || 0) + t.amount;
+  const cats = Object.entries(byC).filter(([c, v]) => BCATS[c]?.[1] === "out" && v < 0).map(([c, v]) => [c, -v]).sort((a, b) => b[1] - a[1]), totC = cats.reduce((s, [, v]) => s + v, 0);
+  const c6 = months.slice(-6).map((m) => ({ m, ...jointCalc(jt.filter((t) => ym(t.date) === m)) }));
+  const keepM = bMonth; bMonth = last;
+  const js = last ? withScope("all", () => jointSection(D)) : ""; bMonth = keepM;
+  const shared = R.goals.filter((g) => g.profile === "foyer");
+  return `<section class="hero"><div class="eyebrow">Patrimoine du foyer</div><div class="big">${fE(pf.net)}</div>
+      <div class="sub">Nathan ${fE(pn.net)} · Angélique ${fE(pa.net)}</div>
+      <div class="split" role="img" aria-label="Part de chacun"><i style="width:${pf.net > 0 ? Math.max(0, Math.min(100, pn.net / (pn.net + pa.net) * 100)).toFixed(1) : 50}%"></i></div></section>
+    <div class="grid2 grid4">
+      ${tile("Compte joint", fE(jointBal), "solde à deux")}
+      ${tile("Dépenses communes", fE(totC), last ? monthName(last) : "")}
+      ${tile("Versé sur le joint", c6.length ? fE(c6[c6.length - 1].tot) : "—", c6.length ? `Nathan ${fE(c6[c6.length - 1].by.nathan)} · Angélique ${fE(c6[c6.length - 1].by.angelique)}` : "")}
+      ${tile(diff >= 0 ? "Gain d'un PACS" : "Coût d'un PACS", fE(Math.abs(diff)) + "<small style='font-size:12px;font-weight:500'> /an</small>", "sur l'impôt sur le revenu", diff >= 0 ? "gain" : "loss")}
+    </div>
+    <section class="section"><div class="section-head"><h2>Dépenses communes</h2><span class="note">${last ? monthName(last) : ""} · compte joint</span></div>
+      ${cats.length ? `<div class="panel">${cats.map(([c, v]) => `<div class="crow"><span class="dot" style="background:${BCATS[c][2]}"></span><span>${BCATS[c][0]}</span><b>${fE(v)}</b><small class="note">${fP(v / totC * 100, 0)}</small><span class="bar"><i style="width:${(v / cats[0][1] * 100).toFixed(1)}%;background:${BCATS[c][2]}"></i></span></div>`).join("")}</div>` : `<div class="panel empty">Importe un relevé du compte joint pour voir vos dépenses communes.</div>`}</section>
+    <section class="section"><div class="section-head"><h2>Qui verse quoi</h2><span class="note">versements sur le joint</span></div>
+      ${c6.length ? `<div class="panel kv"><div class="strong"><span>Mois</span><span>Nathan · Angélique</span></div>${c6.map((c) => `<div><span>${monthName(c.m)}</span><span>${fE(c.by.nathan)} · ${fE(c.by.angelique)}</span></div>`).join("")}</div>` : `<div class="panel empty">Pas encore de relevé du compte joint.</div>`}</section>
+    ${js ? `<div class="section">${js}</div>` : ""}
+    <section class="section"><div class="section-head"><h2>Objectifs communs</h2><span class="note">créés dans le profil Foyer</span></div>
+      ${shared.length ? `<div class="panel goals">${shared.map((g) => `<button class="goal" data-act="edit-goal" data-id="${g.id}"><span class="gh"><b>${esc(g.name)}</b><span>${g.target ? fE(g.target) : ""}</span></span></button>`).join("")}</div>` : `<div class="panel empty">Aucun objectif commun pour l'instant. Passe sur le profil Foyer, onglet Objectifs, pour en créer un (voyage, apport, mariage…).</div>`}</section>`;
 }
 // regroupe des volets repliables dans une seule carte, sous un petit titre
 function stack(title, parts) {
@@ -1678,7 +1805,7 @@ document.addEventListener("input", (e) => {
   document.getElementById("proj-out").innerHTML = projOut(portfolio());
 });
 // fiscalité
-function taxSection(P) {
+function taxCalc(P) {
   const PFU = 31.4, PS = 18.6, now = new Date();
   const gain = (a) => a.hs.reduce((s, h) => s + h.qty * (h.price - h.pru), 0);
   const peas = P.accRows.filter((a) => a.type === "pea"), ctos = P.accRows.filter((a) => a.type === "cto" || a.type === "crypto"), avs = P.accRows.filter((a) => a.type === "assurance_vie"), livs = P.accRows.filter((a) => a.type === "livret");
@@ -1693,6 +1820,10 @@ function taxSection(P) {
   const avGain = avs.reduce((s, a) => s + envGain(a), 0), avTax = avs.reduce((s, a) => { const g = Math.max(0, envGain(a)); return s + (eightOk(a) ? g * PS / 100 + Math.max(0, g - 4600) * 7.5 / 100 : g * PFU / 100); }, 0);
   const crypNo = ctos.filter((a) => a.type === "crypto" && !a.hs.length && a.value > 0);
   const livInt = livs.reduce((s, a) => s + a.value * ((a.rate ?? 1.7) / 100), 0);
+  return { PFU, PS, now, gain, peas, ctos, avs, livs, ctoGain, ctoTax, ctoLines, envGain, fiveOk, eightOk, peaGain, peaTax, avGain, avTax, crypNo, livInt };
+}
+function taxSection(P) {
+  const { PFU, PS, now, gain, peas, ctos, avs, livs, ctoGain, ctoTax, ctoLines, envGain, fiveOk, eightOk, peaGain, peaTax, avGain, avTax, crypNo, livInt } = taxCalc(P);
   const peaRow = (a) => {
     if (!a.openedAt) return `<div><span>${esc(a.name)} <small class="note">${esc(a.institution || "")}</small></span><span class="note">date d'ouverture inconnue</span></div>`;
     const five = new Date(a.openedAt); five.setFullYear(five.getFullYear() + 5);
@@ -1704,7 +1835,7 @@ function taxSection(P) {
     const eight = new Date(a.openedAt); eight.setFullYear(eight.getFullYear() + 8);
     return `<div><span>${esc(a.name)} <small class="note">ouvert le ${new Date(a.openedAt).toLocaleDateString("fr-FR")}</small></span><span>${eight <= now ? '<b class="gain">8 ans atteints</b>' : "8 ans le " + eight.toLocaleDateString("fr-FR")}</span></div>`;
   };
-  return `<details class="section fold"><summary><span class="fold-t"><h2>Fiscalité</h2><span class="note">PEA, compte-titres, assurance-vie, livrets</span></span><b>${ctoTax + peaTax + avTax ? fE(ctoTax + peaTax + avTax) + "<small> si tu vends tout</small>" : "—"}</b></summary>
+  return `<details class="section fold"><summary><span class="fold-t"><h2>Plus-values et enveloppes</h2><span class="note">PEA, compte-titres, assurance-vie, livrets</span></span><b>${ctoTax + peaTax + avTax ? fE(ctoTax + peaTax + avTax) + "<small> si tu vends tout</small>" : "—"}</b></summary>
     ${peas.length ? `<div class="panel kv"><div class="strong"><span>PEA : l'horloge des 5 ans</span><span></span></div>${peas.map(peaRow).join("")}
       <div><span>Plus-values latentes <small class="note">valeur − versements</small></span><span class="${tone(peaGain)}">${fE(peaGain)}</span></div>
       <div><span>Impôt si tu retirais tout aujourd'hui</span><span>${fE(peaTax)}</span></div>
@@ -2525,6 +2656,13 @@ function perSection(P) {
     <p class="note" style="margin-top:6px">${base.tmi <= 0.11 ? "À 11 % ou moins, l'avantage est faible : à la sortie, le capital est imposé au barème, souvent au même taux. Le PEA ou l'assurance-vie restent plus souples. " : "À 30 % ou plus, le PER est intéressant : tu économises maintenant à un taux souvent plus haut qu'à la retraite. "}L'argent est bloqué jusqu'à la retraite (sauf achat de ta résidence principale et accidents de la vie). Plafond estimé : 10 % de tes revenus nets, au moins 4 710 €, plus les plafonds non utilisés des 3 dernières années (voir ton avis d'impôt). Ton PERCOL Epsor est déjà un PER.${by ? "" : " Ajoute ton année de naissance (Indépendance financière) pour un horizon exact."}</p></details>`;
 }
 document.addEventListener("input", (e) => { if (e.target.id !== "per-sim") return; perSim = Number(e.target.value); openFolds.add("per"); const y = window.scrollY; render(); window.scrollTo(0, y); const r = document.getElementById("per-sim"); if (r) r.focus(); });
+// impôt sur le revenu du foyer d'après les réglages (ou le salaire du Budget)
+function irNow() {
+  const st = setOf("tax"), keep = (k) => withProfile(k, () => { const D = withScope("perso", budgetData), now = curMonth(); const ms = [...new Set(D.tx.map((t) => ym(t.date)))].filter((m) => m < now).sort().slice(-3); return ms.length ? Math.round(ms.reduce((s, m) => s + D.tx.filter((t) => ym(t.date) === m && t.c === "salaire").reduce((a, t) => a + t.amount, 0), 0) / ms.length * 12) : 0; });
+  const ab = (v) => st.gross ? v : Math.round(v * 0.9), rn = st.nathan ?? ab(keep("nathan")), ra = st.angelique ?? ab(keep("angelique"));
+  const sep = irCalc([rn, ra], false, 0), cpl = irCalc([rn, ra], true, 0);
+  return { st, rn, ra, sep, cpl, base: st.couple ? cpl : sep };
+}
 function taxIRSection(P) {
   if (profile === "sci") return "";
   const st = setOf("tax"), keep = (k) => withProfile(k, () => { const D = withScope("perso", budgetData), now = curMonth(); const ms = [...new Set(D.tx.map((t) => ym(t.date)))].filter((m) => m < now).sort().slice(-3); return ms.length ? Math.round(ms.reduce((s, m) => s + D.tx.filter((t) => ym(t.date) === m && t.c === "salaire").reduce((a, t) => a + t.amount, 0), 0) / ms.length * 12) : 0; });
@@ -2757,9 +2895,9 @@ function render() {
   const P = portfolio();
   const pb = document.getElementById("profiles");
   if (pb) pb.innerHTML = PROFILES.map((p) => `<button role="tab" class="prof" aria-selected="${p.k === profile}" data-profile="${p.k}"><span class="av-s">${p.k === "foyer" ? "∞" : p.label.charAt(0)}</span>${p.label}</button>`).join("");
-  $("#view").innerHTML = tab === "comptes" ? viewComptes(P) : tab === "positions" ? viewPositions(P) : tab === "immobilier" ? viewImmo(P) : tab === "budget" ? viewBudget() : tab === "marches" ? viewMarket(P) : viewSynthese(P);
+  $("#view").innerHTML = tab === "comptes" ? viewComptes(P) : tab === "positions" ? viewPositions(P) : tab === "immobilier" ? viewImmo(P) : tab === "budget" ? viewBudget() : tab === "marches" ? viewMarket(P) : tab === "fiscalite" ? viewFiscal(P) : tab === "objectifs" ? viewGoals(P) : tab === "couple" ? viewCouple() : viewSynthese(P);
   deskLayout();
-  document.querySelectorAll(".tab").forEach((t) => t.setAttribute("aria-current", t.dataset.tab === tab ? "page" : "false"));
+  document.querySelectorAll(".tab").forEach((t) => t.setAttribute("aria-current", t.dataset.tab === tab || (t.classList.contains("plus") && document.querySelector(`.tab.x-tab[data-tab="${tab}"]`)) ? "page" : "false"));
   if (sheet && sheet.live) openSheet(sheet, true);
   else if (pendingOpen) openPending();
 }
@@ -2782,7 +2920,7 @@ function openForm(kind, data, extra) {
 function goBack() { const b = sheet?.back; if (b) openSheet(b); else closeSheet(); }
 
 function setTab(t) {
-  tab = ["synthese", "comptes", "positions", "immobilier", "budget", "marches"].includes(t) ? t : "synthese";
+  tab = ["synthese", "comptes", "positions", "immobilier", "budget", "marches", "fiscalite", "objectifs", "couple"].includes(t) ? t : "synthese";
   if (location.hash.slice(1) !== tab) { try { history.replaceState(null, "", "#" + tab); } catch {} }
   render(); window.scrollTo(0, 0);
 }
@@ -2805,7 +2943,7 @@ document.addEventListener("click", async (e) => {
   const md = e.target.closest("[data-mday]"); if (md) { mDay = md.dataset.mday || null; render(); return window.scrollTo(0, 0); }
   const se = e.target.closest("[data-series]"); if (se) { histSeries = se.dataset.series; return render(); }
   const t = e.target.closest("[data-tab],[data-act]"); if (!t) return;
-  if (t.dataset.tab) return setTab(t.dataset.tab);
+  if (t.dataset.tab) { if (sheet) closeSheet(); return setTab(t.dataset.tab); }
   const id = t.dataset.id, act = t.dataset.act;
   const find = (col) => S[col].find((x) => x.id === id);
   if (act === "close") return sheet?.back ? goBack() : closeSheet();
@@ -2835,6 +2973,8 @@ document.addEventListener("click", async (e) => {
   if (act === "watch-del") { if (t.dataset.confirm !== "1") { t.dataset.confirm = "1"; t.textContent = "Confirmer la suppression"; return; } t.disabled = true; try { await db.collection("watch").doc(id).delete(); closeSheet(); } catch (err) { showErr(err); t.disabled = false; } return; }
   if (act === "open-account") openSheet({ type: "account", id, live: true });
   else if (act === "open-property") openSheet({ type: "property", id, live: true });
+  else if (act === "more-tabs") openSheet({ html: `<div class="sheet-head"><h2>Plus</h2><button class="x" data-act="close" aria-label="Fermer">×</button></div>
+    <div class="panel list more-list">${[...document.querySelectorAll(".tab.x-tab")].map((b) => `<button class="row" data-tab="${b.dataset.tab}"><span class="txl">${b.innerHTML}</span><span class="note">›</span></button>`).join("")}</div>` });
   else if (act === "monthly") openSheet({ html: sheetMonthly() });
   else if (act === "new-account") openForm("account", null, { type: t.dataset.type });
   else if (act === "edit-account") openForm("account", find("accounts"));
