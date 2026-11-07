@@ -735,7 +735,7 @@ function accountPerf(a) {
 }
 function ytdTable(P) {
   const rows = P.accRows.filter((a) => isInvestType(a.type)).map((a) => ({ a, r: accountPerf(a) })).filter((x) => x.r);
-  if (!rows.length) return "";
+  if (!rows.length) return profile === "sci" || !P.accRows.some((a) => isInvestType(a.type)) ? "" : emptyFold("ytd", `Performance ${new Date().getFullYear()} des placements`, "gain des marchés, hors versements", `Ouvre chaque compte de placement (Comptes) et renseigne « Valeur au 31/12 de l'an dernier » et sa date : la performance de l'année se calcule alors toute seule.`);
   const missing = P.accRows.filter((a) => isInvestType(a.type) && a.value > 0 && a.startValue == null);
   const g = rows.reduce((s, x) => s + x.r.gain, 0);
   const start = rows.reduce((s, x) => s + x.r.start, 0), net = rows.reduce((s, x) => s + x.r.net, 0);
@@ -1424,7 +1424,8 @@ function fixedCharges() {
   const keep = bScope; bScope = "all"; const D = budgetData(); bScope = keep;
   const now = new Date().toISOString().slice(0, 7), solo = profile === "nathan" || profile === "angelique";
   const own = solo ? { ...D, tx: D.tx.filter((t) => t.accountId !== "joint") } : D;
-  const last = [...new Set(own.tx.map((t) => ym(t.date)))].filter((m) => m < now).sort().pop();
+  // dernier mois complet connu (le joint suffit si les comptes perso n'ont pas encore de relevés)
+  const last = [...new Set(D.tx.map((t) => ym(t.date)))].filter((m) => m < now).sort().pop();
   if (!last) return null;
   // seulement les vraies charges : logement, abonnements, assurances, transport (pas les achats ou virements ponctuels)
   const items = recurring(own, last).filter((r) => ["logement", "abos"].includes(r.c) || RECUR_RE.test(normL(r.label))).map((r) => ({ label: r.label, amt: r.perMonth }));
@@ -1547,7 +1548,7 @@ function goalsSection(P) {
       <button class="seg-b" data-act="goal-new-kind" data-kind="pot">+ Cagnotte de projet</button>
       </div>` + (goals.length ? "" : `<div class="seg" style="margin-top:6px">
       ${livA ? `<button class="seg-b" data-act="new-goal" data-preset='${esc(JSON.stringify({ name: "Livret A au plafond", target: 22950, accounts: [livA.id] }))}'>+ Livret A au plafond</button>` : ""}
-      ${av ? `<button class="seg-b" data-act="new-goal" data-preset='${esc(JSON.stringify({ name: "Réserve de 6 mois de charges fixes", target: Math.round((fixedCharges()?.total || av.out) * 6 / 100) * 100, accounts: liq }))}'>+ Réserve de 6 mois</button>` : ""}</div>`);
+      ${av || fixedCharges()?.total ? `<button class="seg-b" data-act="new-goal" data-preset='${esc(JSON.stringify({ name: "Réserve de 6 mois de charges fixes", target: Math.round((fixedCharges()?.total || av.out) * 6 / 100) * 100, accounts: liq }))}'>+ Réserve de 6 mois</button>` : ""}</div>`);
   if (profile === "sci") return "";
   return `<section class="section"><div class="section-head"><h2>Objectifs</h2>${S.writable ? `<button class="btn ghost sm" data-act="goal-choose">Ajouter</button>` : ""}</div>
     ${rows ? `<div class="panel goals">${rows}</div>` : `<div class="panel empty" style="padding:14px">Fixe-toi un cap : un montant à épargner, un patrimoine à atteindre ou un achat immobilier.${profile === "foyer" ? "<br>Les objectifs créés ici sont communs au foyer." : ""}</div>`}${S.writable ? sugg : ""}</section>`;
@@ -1737,7 +1738,7 @@ function compareSection(series, D) {
   const cur = series[series.length - 1], isCur = cur.m === curMonth(), dd = new Date().getDate();
   // mois en cours : comparé au mois précédent arrêté au même jour
   const prev = isCur ? { m: series[series.length - 2].m, ...monthTotals(D.tx.filter((t) => ym(t.date) === series[series.length - 2].m && Number(t.date.slice(8, 10)) <= dd)) } : series[series.length - 2];
-  if (!prev || !Object.keys(prev.by).length || !Object.keys(cur.by).length) return "";
+  if (!prev || !Object.keys(prev.by).length || !Object.keys(cur.by).length) return emptyFold("cmp", "Comparaison avec le mois précédent", "dépenses en hausse ou en baisse", NEED_TX().replace("au moins un mois complet", "deux mois"));
   const hist = series.slice(0, -1).filter((s) => Object.keys(s.by).length);
   const rows = Object.keys(BCATS).filter((c) => BCATS[c][1] === "out").map((c) => {
     const v = -(cur.by[c] || 0), p = -(prev.by[c] || 0), a = hist.reduce((s, x) => s - (x.by[c] || 0), 0) / hist.length;
@@ -1911,7 +1912,7 @@ async function saveBudgetSettings(form) {
 // 10. indépendance financière : 25 fois les dépenses annuelles (règle des 4 %)
 function fireSection(P) {
   if (profile === "sci") return "";
-  const av = avgSaving(); if (!av || !(av.out > 0)) return "";
+  const av = avgSaving(); if (!av || !(av.out > 0)) return emptyFold("fire", "Indépendance financière", "à quel âge tes placements pourraient payer tes dépenses", NEED_TX());
   const now = new Date(), spend = av.out * 12, target = spend * 25;
   const cur = P.accRows.reduce((s, a) => s + a.value, 0) + Math.max(0, P.partsVal || 0);
   const birth = setOf(profile).birthYear, r = 0.03 / 12;
@@ -2319,8 +2320,10 @@ function passiveSection(P) {
 
 // ---- santé financière (avec l'épargne de précaution) ----
 function healthCalc(P) {
-  const av = avgSaving(); if (!av || !(av.out > 0)) return null;
-  const fx = fixedCharges(), base = fx && fx.total > 0 ? fx.total : av.out;
+  const av0 = avgSaving(), fx = fixedCharges(), noTx = !av0 || !(av0.out > 0);
+  if (noTx && !(fx && fx.total > 0)) return null;
+  // sans relevés perso : on garde l'épargne de précaution (charges fixes connues) et on laisse le taux d'épargne de côté
+  const av = noTx ? { out: fx.total, rest: 0, joint: null } : av0, base = fx && fx.total > 0 ? fx.total : av.out;
   const liq = P.accRows.filter((a) => ["courant", "livret"].includes(a.type)).reduce((s, a) => s + a.value, 0), months = liq / base;
   const inc = av.out + av.rest, rate = inc > 0 ? (av.rest / inc) * 100 : 0;
   const loans = [...P.propRows.flatMap((p) => p.loans.map((l) => loanStatus(l).pmtAll * ((p.share ?? 100) / 100))), ...P.otherLoans.map((l) => l.s.pmtAll)].reduce((s, x) => s + x, 0);
@@ -2329,22 +2332,25 @@ function healthCalc(P) {
   const fr = P.accRows.filter((a) => isInvestType(a.type) && a.value > 0).map((a) => ({ a, f: feesOf(a) })).filter((x) => x.f.known);
   const fb = fr.reduce((s, x) => s + x.a.value, 0), fee = fb ? (fr.reduce((s, x) => s + x.f.total, 0) / fb) * 100 : null;
   const parts = [
-    { k: "Taux d'épargne", v: `${fP(rate, 0)}`, pts: Math.max(0, Math.min(25, (rate / 20) * 25)), max: 25, tip: `Vise 20 % : mets ${fE(Math.max(0, inc * 0.2 - av.rest))} de plus de côté par mois.` },
+    noTx ? { k: "Taux d'épargne", v: "relevés manquants", pts: 0, max: 0, na: true, tip: NEED_TX() } : { k: "Taux d'épargne", v: `${fP(rate, 0)}`, pts: Math.max(0, Math.min(25, (rate / 20) * 25)), max: 25, tip: `Vise 20 % : mets ${fE(Math.max(0, inc * 0.2 - av.rest))} de plus de côté par mois.` },
     { k: "Épargne de précaution", v: `${String(Math.round(months * 10) / 10).replace(".", ",")} mois`, pts: Math.max(0, Math.min(25, (months / 6) * 25)), max: 25, tone: months >= 6 ? "gain" : months >= 3 ? "warn" : "loss", tip: `Vise 6 mois de charges fixes (${fE(base * 6)}) sur tes comptes et livrets : il manque ${fE(Math.max(0, base * 6 - liq))}.` },
     { k: "Endettement", v: fP(debtR, 0), pts: debtR <= 35 ? 15 : Math.max(0, 15 - (debtR - 35)), max: 15, tip: "Garde tes mensualités sous 35 % de tes revenus." },
     { k: "Diversification", v: `${fP(top, 0)} sur une seule poche`, pts: top <= 50 ? 20 : Math.max(0, 20 - (top - 50) * 0.5), max: 20, tip: "Aucune poche ne devrait dépasser la moitié de ton patrimoine." },
     { k: "Frais", v: fee != null ? fP(fee, 2) + "/an" : "—", pts: fee == null ? 10 : fee <= 0.5 ? 15 : fee <= 1 ? 10 : fee <= 1.5 ? 5 : 0, max: 15, tip: "Privilégie les ETF et les enveloppes à frais bas (moins de 0,5 %/an)." },
   ];
-  const score = Math.round(parts.reduce((s, p) => s + p.pts, 0));
-  const worst = [...parts].sort((a, b) => a.pts / a.max - b.pts / b.max)[0];
+  const maxT = parts.reduce((s, p) => s + p.max, 0) || 1, score = Math.round((parts.reduce((s, p) => s + p.pts, 0) / maxT) * 100);
+  const worst = [...parts].filter((p) => !p.na).sort((a, b) => a.pts / a.max - b.pts / b.max)[0];
   return { score, parts, worst, months, liq, out: base, fx, joint: av.joint };
 }
+// volet affiché même sans données, avec ce qu'il manque pour le remplir (mêmes options sur chaque profil)
+const emptyFold = (k, title, note, body) => `<details class="section fold" data-fold="${k}" ${openFolds.has(k) ? "open" : ""}><summary><span class="fold-t"><h2>${title}</h2><span class="note">${note}</span></span><b class="note">à compléter</b></summary><p class="note" style="margin:0 0 4px">${body}</p></details>`;
+const NEED_TX = () => `Il faut au moins un mois complet d'opérations sur les comptes courants de ce profil. Importe les relevés dans Budget (Importer un relevé) ou envoie-les à Claude${profile === "angelique" ? " : il manque encore le compte courant BoursoBank d'Angélique" : ""}.`;
 function healthSection(P) {
   if (profile === "sci") return "";
-  const h = healthCalc(P); if (!h) return "";
+  const h = healthCalc(P); if (!h) return emptyFold("health", "Santé financière", "épargne de précaution, taux d'épargne, frais", NEED_TX());
   const col = h.score >= 75 ? "var(--gain)" : h.score >= 50 ? "#d9822b" : "var(--loss)";
   return `<details class="section fold" data-fold="health" ${openFolds.has("health") ? "open" : ""}><summary><span class="fold-t"><h2>Santé financière</h2><span class="note">épargne de précaution : <b class="${h.months >= 6 ? "gain" : h.months >= 3 ? "warn" : "loss"}">${String(Math.round(h.months * 10) / 10).replace(".", ",")} mois</b></span></span><b style="color:${col}">${h.score}<small>/100</small></b></summary>
-    <div class="panel kv">${h.parts.map((p) => `<div><span>${p.k}<small class="note"> · ${p.v}</small><span class="bar" style="display:block;margin-top:5px"><i style="width:${((p.pts / p.max) * 100).toFixed(0)}%;background:${p.pts / p.max >= 0.75 ? "var(--gain)" : p.pts / p.max >= 0.4 ? "#d9822b" : "var(--loss)"}"></i></span></span><span>${Math.round(p.pts)}/${p.max}</span></div>`).join("")}
+    <div class="panel kv">${h.parts.map((p) => p.na ? `<div><span>${p.k}<small class="note"> · ${p.v}, pas compté dans le score</small></span><span>—</span></div>` : `<div><span>${p.k}<small class="note"> · ${p.v}</small><span class="bar" style="display:block;margin-top:5px"><i style="width:${((p.pts / p.max) * 100).toFixed(0)}%;background:${p.pts / p.max >= 0.75 ? "var(--gain)" : p.pts / p.max >= 0.4 ? "#d9822b" : "var(--loss)"}"></i></span></span><span>${Math.round(p.pts)}/${p.max}</span></div>`).join("")}
       <div class="strong"><span>Le levier le plus utile : ${h.worst.k.toLowerCase()}</span><span></span></div><div><span class="note">${h.worst.tip}</span></div></div>
     ${h.fx ? `<div class="panel kv" style="margin-top:10px">
       <div class="strong"><span>Charges fixes par mois</span><span>${fE(h.out)}</span></div>
