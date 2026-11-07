@@ -412,6 +412,9 @@ details.fold > summary .note b { font-family: var(--font-body); font-weight: 700
   .cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0 28px; align-items: start; }
   .col { min-width: 0; display: grid; align-content: start; }
   .col > :first-child { margin-top: 22px; }
+  .glue { display: grid; align-content: start; margin-top: 22px; }
+  .glue > :first-child { margin-top: 0; }
+  .glue > .seg.acts { margin-top: 8px; }
   .sheet { left: auto; right: 0; top: 0; bottom: 0; width: 520px; max-height: none; transform: none; border-radius: 26px 0 0 26px; padding-block: 18px 28px; padding-inline: 28px; box-shadow: -20px 0 60px rgb(0 0 0 / .12); }
   .sheet .grab { display: none; }
   .scrim { background: rgb(0 0 0 / 0.22); }
@@ -2720,8 +2723,19 @@ const $ = (s) => document.querySelector(s);
 const DESK = window.matchMedia("(min-width: 1100px)");
 function deskLayout() {
   const v = $("#view"); if (!v || !DESK.matches) return;
-  const kids = [...v.children], full = (e) => e.matches(".hero, .grid2, .seg, .section-head, .add, div.section, .toprow") || e.getBoundingClientRect().height > 900;
+  const kids = [...v.children];
   const hero = kids[0]; if (hero?.matches(".hero") && kids[1]?.matches(".grid2")) { const t = document.createElement("div"); t.className = "toprow"; hero.before(t); t.append(hero, kids[1]); }
+  // en tête de vue (avant le premier bloc) : pleine largeur ; ensuite tout passe en colonnes,
+  // les petits en-têtes (titre, filtres, bouton) restent collés au bloc qui les suit
+  const lead = (e) => e.matches(".hero, .toprow, .seg:not(.acts), .add, div.section:not(:has(h2))");
+  let started = false, glue = [];
+  for (const e of [...v.children]) {
+    if (!started && lead(e)) continue;
+    if (e.getBoundingClientRect().height > 900) { started = true; continue; }
+    started = true;
+    if (e.matches(".section-head, .seg, .add, div.section:not(:has(h2))") && !e.matches("section")) { glue.push(e); continue; }
+    if (glue.length) { const g = document.createElement("div"); g.className = "glue"; glue[0].before(g); g.append(...glue, e); glue = []; }
+  }
   let buf = [];
   const flush = (before) => {
     if (buf.length < 2) { buf = []; return; }
@@ -2732,7 +2746,8 @@ function deskLayout() {
     buf.forEach((e, i) => { const k = h[0] <= h[1] ? 0 : 1; cs[k].append(e); h[k] += hs[i] + 22; });
     box.append(...cs); buf = [];
   };
-  for (const e of [...v.children]) { if (full(e)) flush(e); else buf.push(e); }
+  started = false;
+  for (const e of [...v.children]) { const f = (!started && lead(e)) || e.getBoundingClientRect().height > 900; if (!f) started = true; if (f) flush(e); else buf.push(e); }
   flush(null);
 }
 let deskWas = DESK.matches;
